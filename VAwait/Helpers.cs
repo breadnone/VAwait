@@ -9,6 +9,7 @@ namespace VAwait
     {
         public void AssignTokenSource(CancellationTokenSource tokenSource);
         public void AssignEnumerator(IEnumerator enumerator);
+        public int GetSetId {get;set;}
     }
     public class SignalAwaiter : INotifyCompletion, IVSignal
     {
@@ -17,13 +18,14 @@ namespace VAwait
         private Exception _exception;
         public CancellationTokenSource tokenSource { get; private set; }
         public IEnumerator enumerator { get; private set; }
+        int IVSignal.GetSetId{get;set;} = -1;
 
         public bool IsCompleted
         {
             get;
             private set;
         }
-        
+
         void IVSignal.AssignTokenSource(CancellationTokenSource tokenSource)
         {
             this.tokenSource = tokenSource;
@@ -125,6 +127,7 @@ namespace VAwait
             this._exception = null;
             this.IsCompleted = false;
             this.enumerator = null;
+            (this as IVSignal).GetSetId = -1;
             return this;
         }
 

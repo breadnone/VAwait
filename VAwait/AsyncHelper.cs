@@ -190,23 +190,33 @@ namespace VAwait
             }, null);
             return ins;
         }
+        public static SignalAwaiter SetId(this SignalAwaiter signal, int id)
+        {
+            if(id < 0)
+            {
+                throw new Exception("VAwait Error : Id can't be negative number");
+            }
+
+            (signal as IVSignal).GetSetId = id;
+            return signal;
+        }
         /// <summary>
         /// Cancels an await.
         /// </summary>
-        public static void Cancel(this SignalAwaiter signal)
+        public static void Cancel(this SignalAwaiter signal, int id)
         {
-            bool wasReturned = false;
+            bool wasFound = false;
 
             foreach(var ins in signalPool)
             {
-                if(signal == ins)
+                if(id > -1 && (ins as IVSignal).GetSetId == id)
                 {
-                    wasReturned = true;
+                    wasFound = true;
                     break;
                 }
             }
-
-            if(!wasReturned)
+            
+            if(!wasFound)
             {
                 ReturnAwaiterToPool(signal);
             }
