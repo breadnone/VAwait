@@ -65,7 +65,7 @@ namespace VAwait
         /// Attempts to transition the completion state.
         /// </summary>
         /// <param name="result"></param>
-        /// <returns></returns>
+        /// <returns>Boolean.</returns>
         public bool TrySetResult(bool result)
         {
             if (tokenSource.IsCancellationRequested)
@@ -83,7 +83,6 @@ namespace VAwait
                     _continuation();
                 }
 
-                tokenSource = new();
                 return true;
             }
 
@@ -127,22 +126,20 @@ namespace VAwait
             this._exception = null;
             this.IsCompleted = false;
             this.enumerator = null;
-            (this as IVSignal).GetSetId = -1;
+
+            var isig = this as IVSignal;
+
+            if(isig.GetSetId > -1)
+            {
+                Wait.RemoveIDD(isig.GetSetId);
+                isig.GetSetId = -1;
+            }
+
             return this;
         }
 
         public SignalAwaiter GetAwaiter()
         {
-            return this;
-        }
-        public SignalAwaiter WaitForSignal(Action func)
-        {
-            if (tokenSource.IsCancellationRequested)
-            {
-                return this;
-            }
-
-            func.Invoke();
             return this;
         }
         public void Cancel(bool renewTokenSource, bool dispose, bool reset = false)

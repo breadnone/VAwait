@@ -14,9 +14,14 @@ namespace VAwait
         public static CancellationTokenSource vawaitTokenSource {get; set;}
         static (VWaitComponent component, GameObject gameObject) runtimeInstance;
         static ConcurrentQueue<SignalAwaiter> signalPool;
+        static Dictionary<int, SignalAwaiter> setIdd = new();
         public static UPlayStateMode playMode {get;set;} = UPlayStateMode.None;
         public static int poolLength {get;set;} = 15;
         public static SynchronizationContext unityContext{get;set;}
+        public static void RemoveIDD(int id)
+        {
+            setIdd.Remove(id);
+        }
         /// <summary>
         ///Triggers reinitialization.
         /// </summary>
@@ -123,6 +128,8 @@ namespace VAwait
 
             var ins = GetPooled();
             (ins as IVSignal).GetSetId = setId;
+
+            setIdd.TryAdd(setId, ins);
             _= WaitSeconds(duration, ins);
             return ins;
         }
