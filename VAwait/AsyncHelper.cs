@@ -13,9 +13,10 @@ namespace VAwait
     {
         public static CancellationTokenSource vawaitTokenSource {get; set;}
         static (VWaitComponent component, GameObject gameObject) runtimeInstance;
-        static ConcurrentQueue<SignalAwaiter<bool>> signalPool;
+        static ConcurrentQueue<SignalAwaiter> signalPool;
         public static UPlayStateMode playMode {get;set;} = UPlayStateMode.None;
-        public static int poolLength {get;set;} = 10;
+        public static int poolLength {get;set;} = 15;
+        public static SynchronizationContext unityContext{get;set;}
         /// <summary>
         ///Triggers reinitialization.
         /// </summary>
@@ -44,12 +45,12 @@ namespace VAwait
             }
 
             vawaitTokenSource = new();
-            signalPool = new ConcurrentQueue<SignalAwaiter<bool>>();
+            signalPool = new ConcurrentQueue<SignalAwaiter>();
 
             for(int i = 0; i < poolLength; i++)
             {
                 var ctoken = CancellationTokenSource.CreateLinkedTokenSource(vawaitTokenSource.Token);
-                var ins = new SignalAwaiter<bool>();
+                var ins = new SignalAwaiter();
                 (ins as IVSignal).AssignTokenSource(ctoken);
                 signalPool.Enqueue(ins);
             }
@@ -58,14 +59,14 @@ namespace VAwait
         /// Gets an instance of SignalAwaiter from the pool.
         /// </summary>
         /// <returns></returns>
-        static SignalAwaiter<bool> GetPooled()
+        static SignalAwaiter GetPooled()
         {
             if(signalPool.TryDequeue(out var ins))
             {
                 return ins;
             }
 
-            var nins = new SignalAwaiter<bool>();
+            var nins = new SignalAwaiter();
             var ctoken = CancellationTokenSource.CreateLinkedTokenSource(vawaitTokenSource.Token);
             (ins as IVSignal).AssignTokenSource(ctoken);
             return nins;
@@ -74,7 +75,7 @@ namespace VAwait
         /// Returns back to pool.
         /// </summary>
         /// <param name="signal"></param>
-        public static void ReturnAwaiterToPool(SignalAwaiter<bool> signal)
+        public static void ReturnAwaiterToPool(SignalAwaiter signal)
         {
             if(signalPool.Count < poolLength)
             {
@@ -90,21 +91,22 @@ namespace VAwait
         /// Wait for next frame.
         /// </summary>
         /// <returns></returns>
-        public static SignalAwaiter<bool> NextFrame()
+        public static SignalAwaiter NextFrame()
         {
             var ins = GetPooled();
             runtimeInstance.component.TriggerFrameCoroutine(ins, ins.tokenSource);
             return ins;
         }
+
         /// <summary>
         /// Waits for n duration in seconds.
         /// </summary>
         /// <param name="duration"></param>
         /// <returns></returns>
-        public static SignalAwaiter<bool> Seconds (float duration)
+        public static SignalAwaiter Seconds (float duration)
         {
             var ins = GetPooled();
-            WaitSeconds(duration, ins);
+            _= WaitSeconds(duration, ins);
             return ins;
         }
         /// <summary>
@@ -112,9 +114,10 @@ namespace VAwait
         /// </summary>
         /// <param name="coroutine"></param>
         /// <returns></returns>
-        public static SignalAwaiter<bool> Coroutine (IEnumerator coroutine)
+        public static SignalAwaiter Coroutine (IEnumerator coroutine)
         {
             var ins = GetPooled();
+            (ins as IVSignal).AssignEnumerator(coroutine);
             runtimeInstance.component.TriggerCoroutine(coroutine, ins, ins.tokenSource);
             return ins;
         }
@@ -133,7 +136,7 @@ namespace VAwait
                 runtimeInstance = (go.GetComponent<VWaitComponent>(), go);
             }
         }
-        static async void WaitSeconds(float duration, SignalAwaiter<bool> signal)
+        static async ValueTask WaitSeconds(float duration, SignalAwaiter signal)
         {
             await Task.Delay(TimeSpan.FromSeconds(duration), signal.tokenSource.Token);
 
@@ -141,14 +144,57 @@ namespace VAwait
             {
                 return;
             }
-            
+
             runtimeInstance.component.TriggerFrameCoroutine(signal, signal.tokenSource);
+        }
+        /// <summary>
+        /// Runs and switch to threadPool.
+        /// </summary>
+        /// <param name="func">Delegate.</param>
+        public static void RunOnThreadpool(Action func)
+        {
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                func.Invoke();
+            });
+        }
+        /// <summary>
+        /// Runs and awaits from threadPool.
+        /// </summary>
+        /// <param name="func">Delegate.</param>
+        public static SignalAwaiter RunOnThreadpool(Action<bool> func)
+        {
+            var ins = GetPooled();
+
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                func?.Invoke(true);
+                runtimeInstance.component.TriggerFrameCoroutine(ins, ins.tokenSource);
+            });
+
+            return ins;
+        }
+        /// <summary>
+        /// Invokes on mainthread. Can be used to get out of threadPool.
+        /// </summary>
+        /// <param name="func">Delegate.</param>
+        public static SignalAwaiter BeginInvokeOnMainthread(Action func)
+        {
+            var ins = GetPooled();
+
+            // Send a callback to the main thread
+            unityContext.Post(_ =>
+            {
+                func?.Invoke();
+                runtimeInstance.component.TriggerFrameCoroutine(ins, ins.tokenSource);
+            }, null);
+            return ins;
         }
         /// <summary>
         /// Cancels an await.
         /// </summary>
         /// <param name="signal"></param>
-        public static void Cancel(this SignalAwaiter<bool> signal)
+        public static void Cancel(this SignalAwaiter signal)
         {
             ReturnAwaiterToPool(signal);
         }
@@ -163,6 +209,10 @@ namespace VAwait
                 vawaitTokenSource.Dispose();
                 vawaitTokenSource = null;
             }
+        }
+        public static (VWaitComponent component, GameObject gameObject) GetRuntimeInstance()
+        {
+            return runtimeInstance;
         }
     }
 

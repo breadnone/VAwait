@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Threading;
+
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -13,6 +15,7 @@ namespace VAwait
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Start()
         {
+            Wait.unityContext = SynchronizationContext.Current;
             Wait.playMode = UPlayStateMode.PlayMode;
             Wait.StartAwait();
         }
@@ -38,7 +41,6 @@ namespace VAwait.Editor
             {
                 if (state == PlayModeStateChange.EnteredPlayMode)
                 {
-
                 }
                 else if (state == PlayModeStateChange.ExitingPlayMode)
                 {
