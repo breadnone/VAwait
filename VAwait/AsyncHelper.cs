@@ -110,6 +110,23 @@ namespace VAwait
             return ins;
         }
         /// <summary>
+        /// Waits for n duration in seconds.
+        /// </summary>
+        /// <param name="duration"></param>
+        /// <returns></returns>
+        public static SignalAwaiter Seconds (float duration, int setId)
+        {
+            if(setId < 0)
+            {
+                throw new Exception("VAwait Error : Id can't be negative number");
+            }
+
+            var ins = GetPooled();
+            (ins as IVSignal).GetSetId = setId;
+            _= WaitSeconds(duration, ins);
+            return ins;
+        }
+        /// <summary>
         /// Waits for coroutine.
         /// </summary>
         /// <param name="coroutine"></param>
@@ -117,6 +134,7 @@ namespace VAwait
         public static SignalAwaiter Coroutine (IEnumerator coroutine)
         {
             var ins = GetPooled();
+            
             (ins as IVSignal).AssignEnumerator(coroutine);
             runtimeInstance.component.TriggerCoroutine(coroutine, ins, ins.tokenSource);
             return ins;
@@ -190,16 +208,7 @@ namespace VAwait
             }, null);
             return ins;
         }
-        public static SignalAwaiter SetId(this SignalAwaiter signal, int id)
-        {
-            if(id < 0)
-            {
-                throw new Exception("VAwait Error : Id can't be negative number");
-            }
 
-            (signal as IVSignal).GetSetId = id;
-            return signal;
-        }
         /// <summary>
         /// Cancels an await.
         /// </summary>
