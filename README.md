@@ -17,7 +17,7 @@ await Coroutine(MyCoroutine());
 //Canceling an await
 var wait = Wait.NextFrame();
 await wait;
-await.Cancel();
+wait.Cancel();
 
 //Destroy the awaits
 //Use this on ApplciationQuit or when the quitting your game.
