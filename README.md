@@ -19,13 +19,13 @@ var wait = Wait.NextFrame();
 await wait;
 wait.Cancel();
 
+ThreadPool ==========================================
+
 //Runs on threadPool
 Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
 
 //Or awaits the threadPool
 await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
-
-ThreadPool ==========================================
 
 //Back to mainthread from threadPool
 await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
