@@ -12,7 +12,7 @@ await Wait.Seconds(5f);
 await Wait.NextFrame();
 
 //Wait for Coroutines
-await Coroutine(MyCoroutine());
+await Wait.Coroutine(MyCoroutine());
 
 //Canceling an await
 var wait = Wait.NextFrame();
