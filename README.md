@@ -5,35 +5,41 @@
 - Add the namespace in your script `using VAwait;`  
 # Syntax  
 ```
-//Wait for seconds
-await Wait.Seconds(5f);
+async Task AsyncMethod()
+{
 
-//Wait for frames
-await Wait.NextFrame();
-
-//Wait for Coroutines
-await Wait.Coroutine(MyCoroutine());
-
-//Canceling an await
-var wait = Wait.NextFrame();
-await wait;
-wait.Cancel();
+   //Wait for seconds
+   await Wait.Seconds(5f);
+   
+   //Wait for frames
+   await Wait.NextFrame();
+   
+   //Wait for Coroutines
+   await Wait.Coroutine(MyCoroutine());
+   
+   //Canceling an await
+   var wait = Wait.NextFrame();
+   await wait;
+   wait.Cancel();
 
 ThreadPool ==========================================
+   
+   //Runs on threadPool
+   Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
+   
+   //Or awaits the threadPool
+   await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
+   
+   //Back to mainthread from threadPool
+   await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
+   
+   //from here we're in a threadPool userland
+   //To switch back to mainthread, we can use BeginInvokeOnMainthread. see below.
+   
+   await Wait.BeginInvokeOnMainthread(()=>{Debug.Log("Back to Mainthread");});
+   //We are now back in the mainthread
 
-//Runs on threadPool
-Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
-
-//Or awaits the threadPool
-await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
-
-//Back to mainthread from threadPool
-await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
-
-//from here we're in a threadPool userland
-//To switch back to mainthread, we can use BeginInvokeOnMainthread. see below.
-
-await Wait.BeginInvokeOnMainthread(()=>{Debug.Log("Back to Mainthread");});
-//We are now back in the mainthread
-
+}
 ```
+# Note :  
+- The SignalAwaiter instances can't be awaited multiple times.
