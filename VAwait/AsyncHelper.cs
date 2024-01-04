@@ -221,6 +221,11 @@ namespace VAwait
                 ReturnAwaiterToPool(signal);
             }
         }
+        public static void ForceCancelAll()
+        {
+            DestroyAwaits();
+            ReInit();
+        }
         /// <summary>
         /// Do this everytime getting out of playmode while in edit-mode or 
         /// </summary>
