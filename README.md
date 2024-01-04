@@ -30,9 +30,6 @@ ThreadPool ==========================================
    //Or awaits the threadPool
    await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
    
-   //Back to mainthread from threadPool
-   await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
-   
    //from here we're in a threadPool userland
    //To switch back to mainthread, we can use BeginInvokeOnMainthread. see below.
    
