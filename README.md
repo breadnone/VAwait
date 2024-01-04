@@ -19,7 +19,21 @@ var wait = Wait.NextFrame();
 await wait;
 wait.Cancel();
 
-//Destroy the awaits
-//Use this on ApplciationQuit or when the quitting your game.
-Wait.DestroyAwaits();
+//Runs on threadPool
+Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
+
+//Or awaits the threadPool
+await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
+
+ThreadPool ==========================================
+
+//Back to mainthread from threadPool
+await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
+
+//from here we're in a threadPool userland
+//To switch back to mainthread, we can use BeginInvokeOnMainthread. see below.
+
+await Wait.BeginInvokeOnMainthread(()=>{Debug.Log("Back to Mainthread");});
+//We are now back in the mainthread
+
 ```
