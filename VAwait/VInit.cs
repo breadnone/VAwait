@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,12 +40,12 @@ namespace VAwait.Editor
             {
                 if (state == PlayModeStateChange.EnteredPlayMode)
                 {
-                    EditorDeltaTM.StartStopEditorTime(false);
+                    //EditorDeltaTM.StartStopEditorTime(false);
                 }
                 else if (state == PlayModeStateChange.ExitingPlayMode)
                 {
                     Wait.DestroyAwaits();
-                    EditorDeltaTM.StartStopEditorTime(true);
+                    //EditorDeltaTM.StartStopEditorTime(true);
                     Wait.playMode = UPlayStateMode.None;
                 }
             }
