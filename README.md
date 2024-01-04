@@ -18,9 +18,8 @@ async Task AsyncMethod()
    await Wait.Coroutine(MyCoroutine());
    
    //Canceling an await
-   var wait = Wait.NextFrame();
-   await wait;
-   wait.Cancel();
+   await Wait.NextSeconds(10f).SetId(2);
+   Wait.Cancel(2);
 
 ThreadPool ==========================================
    
