@@ -193,10 +193,23 @@ namespace VAwait
         /// <summary>
         /// Cancels an await.
         /// </summary>
-        /// <param name="signal"></param>
         public static void Cancel(this SignalAwaiter signal)
         {
-            ReturnAwaiterToPool(signal);
+            bool wasReturned = false;
+
+            foreach(var ins in signalPool)
+            {
+                if(signal == ins)
+                {
+                    wasReturned = true;
+                    break;
+                }
+            }
+
+            if(!wasReturned)
+            {
+                ReturnAwaiterToPool(signal);
+            }
         }
         /// <summary>
         /// Do this everytime getting out of playmode while in edit-mode or 
