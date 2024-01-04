@@ -102,7 +102,15 @@ namespace VAwait
             runtimeInstance.component.TriggerFrameCoroutine(ins, ins.tokenSource);
             return ins;
         }
-
+        /// <summary>
+        /// Fixed 1 frame value meant to be used for frame waiting while in edit-mode. This is not accurate, just a very rough estimation based on screen's refresh rate.
+        /// </summary>
+        /// <returns></returns>
+        public static double OneFrameFixed()
+        {
+            var refValue = Screen.currentResolution.refreshRateRatio.value;
+            return (1d / refValue) * 1000;
+        }
         /// <summary>
         /// Waits for n duration in seconds.
         /// </summary>
