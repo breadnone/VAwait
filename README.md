@@ -19,27 +19,27 @@ async Task AsyncMethod()
    //Wait for Coroutines
    await Wait.Coroutine(MyCoroutine());
 
-  //Awaiting more than once.
-  //By default the SignalAwaiter can't do this due to object pooling.
-  //We can use the SignalAwaiterReusable for this use case.
+   //Awaiting more than once.
+   //By default the SignalAwaiter can't do this due to object pooling.
+   //We can use the SignalAwaiterReusable for this use case.
+ 
+   var tokenSource = new CancellationTokenSource();
+   var frame = Wait.NextFrameReusable();
+   var second = Wait.SecondsReusable(tokenSource); // Token source must be passed for canceling purposes
+ 
+   while(true)
+   {
+     //Will be reusing the same instance or awaited multiple times.
+     await frame;
+     await second;
+ 
+     //Use frame.Cancel() or second.Cancel() to cancel based on the example above.
+     //Note: Once Reusables are cancelled, they can't be awaited.
+   }
 
-  var tokenSource = new CancellationTokenSource();
-  var frame = Wait.NextFrameReusable();
-  var second = Wait.SecondsReusable(tokenSource); // Token source must be passed for canceling purposes
-
-  while(true)
-  {
-    //Will be reusing the same instance or awaited multiple times.
-    await frame;
-    await second;
-
-    //Use frame.Cancel() or second.Cancel() to cancel based on the example above.
-    //Note: Once Reusables are cancelled, they can't be awaited.
-  }
-   
    //Canceling an await
    await Wait.NextSeconds(10f, setId: 2);
-   Wait.Cancel(2);
+   Wait.TryCancel(2);
 }
 ```
 # Note :  
