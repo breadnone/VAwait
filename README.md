@@ -39,3 +39,4 @@ ThreadPool ==========================================
 ```
 # Note :  
 - The SignalAwaiter instances can't be awaited multiple times.
+- Runtime only.
