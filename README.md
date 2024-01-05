@@ -29,26 +29,14 @@ async Task AsyncMethod()
     //Will be reusing the same instance or awaited multiple times.
     await frame;
     await second;
+
+    //Use frame.Cancel() or second.Cancel() to cancel based on the example above.
+    //Note: Once Reusables are cancelled, they can't be awaited.
   }
    
    //Canceling an await
    await Wait.NextSeconds(10f, setId: 2);
    Wait.Cancel(2);
-
-ThreadPool ==========================================
-   
-   //Runs on threadPool
-   Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
-   
-   //Or awaits the threadPool
-   await Wait.RunOnThreadpool(()=>{Debug.Log("In a threadPool.");});
-   
-   //from here we're in a threadPool userland
-   //To switch back to mainthread, we can use BeginInvokeOnMainthread. see below.
-   
-   await Wait.BeginInvokeOnMainthread(()=>{Debug.Log("Back to Mainthread");});
-   //We are now back in the mainthread
-
 }
 ```
 # Note :  
