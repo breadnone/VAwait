@@ -13,6 +13,9 @@ async Task AsyncMethod()
    //Wait for frames
    await Wait.NextFrame();
 
+   //Wait end of frame
+   await Wait.EndOfFrame();
+
    //Wait for FixedUpdate
    await Wait.FixedUpdate();
    
