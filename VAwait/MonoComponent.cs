@@ -42,7 +42,6 @@ namespace VAwait
             yield return coroutine;
             signal.TrySetResult(true);    
             Wait.ReturnAwaiterToPool(signal);
-
         }
         public void TriggerFrameCoroutine(SignalAwaiter signal)
         {

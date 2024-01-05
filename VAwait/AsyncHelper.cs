@@ -31,21 +31,21 @@ namespace VAwait
         }
         static void PrepareAsyncHelper()
         {
+            if(vawaitTokenSource != null)
+            {
+                vawaitTokenSource.Cancel();
+                vawaitTokenSource.Dispose();
+            }
+
             if(signalPool != null && signalPool.Count > 0)
             {
                 for(int i = 0; i < signalPool.Count; i++)
                 {
                     if(signalPool.TryDequeue(out var func))
                     {
-                        func.Reset();
+                        func.Cancel();
                     }
                 }
-            }
-
-            if(vawaitTokenSource != null)
-            {
-                vawaitTokenSource.Cancel();
-                vawaitTokenSource.Dispose();
             }
 
             vawaitTokenSource = new();
