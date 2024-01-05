@@ -97,18 +97,29 @@ namespace VAwait
         /// <summary>
         /// Reusable awaiter, can be awaited multiple times.
         /// </summary>
-        /// <returns></returns>
         public static SignalAwaiterReusable NextFrameReusable()
         {
             return new SignalAwaiterReusable(vawaitTokenSource);
         }
         /// <summary>
-        /// Reusable awaiter, can be awaited multiple times.
+        /// Reusable awaiter that can be awaited multiple times.Unlike NextFrameReusable, a CancellationTokenSource must be provided.
+        /// </summary>
+        /// <param name="cts">Token source.</param>
+        public static SignalAwaiterReusable SecondsReusable(float time, CancellationTokenSource cancellationTokenSource)
+        {
+            var ins = new SignalAwaiterReusable(cancellationTokenSource);
+            ins.wait = new WaitForSeconds(time);
+            return ins;
+        }
+        /// <summary>
+        /// Awaits for the next FixedUpdate.
         /// </summary>
         /// <returns></returns>
-        public static SignalAwaiterReusable SecondsReusable(float time)
+        public static SignalAwaiter FixedUpdate()
         {
-            return new SignalAwaiterReusable(vawaitTokenSource);
+            var ins = GetPooled();
+            runtimeInstance.component.TriggerFixedUpdateCoroutine(ins);
+            return ins;
         }
         /// <summary>
         /// Fixed 1 frame value meant to be used for frame waiting while in edit-mode. This is not accurate,\njust a very rough estimation based on screen's refresh rate.

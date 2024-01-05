@@ -2,17 +2,21 @@ using System.Collections;
 using UnityEngine;
 using System.Threading;
 using System;
+using System.Collections.Generic;
 
 namespace VAwait
 {
+    [AddComponentMenu("")]
     public class VWaitComponent : MonoBehaviour
     {
         static VWaitComponent mono { get; set; }
+        WaitForFixedUpdate waitFixed;
         void OnEnable()
         {
+            waitFixed = new WaitForFixedUpdate();
             DontDestroyOnLoad(this.gameObject);
         }
-        // Start is called before the first frame update
+
         void Start()
         {
             if (mono == null)
@@ -37,9 +41,20 @@ namespace VAwait
             signal.TrySetResult(true);
             Wait.ReturnAwaiterToPool(signal);
         }
+        IEnumerator InstanceCoroutineFixedUpdate(SignalAwaiter signal)
+        {
+            yield return waitFixed;
+            signal.TrySetResult(true);
+            Wait.ReturnAwaiterToPool(signal);
+        }
         IEnumerator InstanceCoroutineFrameReusable(SignalAwaiterReusable signal)
         {
             yield return null;
+            signal.TrySetResult(true);
+        }
+        IEnumerator InstanceCoroutineSecondsReusable(WaitForSeconds wait, SignalAwaiterReusable signal)
+        {
+            yield return wait;
             signal.TrySetResult(true);
         }
         IEnumerator InstanceCoroutine(IEnumerator coroutine, SignalAwaiter signal)
@@ -47,6 +62,10 @@ namespace VAwait
             yield return coroutine;
             signal.TrySetResult(true);    
             Wait.ReturnAwaiterToPool(signal);
+        }
+        public void TriggerFixedUpdateCoroutine(SignalAwaiter signal)
+        {
+            StartCoroutine(InstanceCoroutineFixedUpdate(signal));
         }
         public void TriggerFrameCoroutine(SignalAwaiter signal)
         {
@@ -57,6 +76,11 @@ namespace VAwait
             signal.AssignEnumerator(InstanceCoroutineFrameReusable(signal));
             StartCoroutine(signal.enumerator);
         }
+        public void TriggerSecondsCoroutineReusable(WaitForSeconds wait, SignalAwaiterReusable signal)
+        {
+            signal.AssignEnumerator(InstanceCoroutineSecondsReusable(wait, signal));
+            StartCoroutine(signal.enumerator);
+        }
         public void TriggerSecondsCoroutine(ref float duration, SignalAwaiter signal)
         {
             StartCoroutine(InstanceCoroutineSeconds(duration, signal));
@@ -65,6 +89,7 @@ namespace VAwait
         {
             StartCoroutine(InstanceCoroutine(coroutine, signal));
         }
+
         public void CancelCoroutines()
         {
             StopAllCoroutines();

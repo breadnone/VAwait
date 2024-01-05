@@ -2,12 +2,13 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Collections;
 using System.Threading;
+using UnityEngine;
 
 namespace VAwait
 {
     /// <summary>
     /// Awaiter class.
-    /// </summary>/.
+    /// </summary>
     public class SignalAwaiter : ICriticalNotifyCompletion
     {
         private Action _continuation;
@@ -123,13 +124,14 @@ namespace VAwait
 
     /// <summary>
     /// Awaiter class.
-    /// </summary>/.
+    /// </summary>
     public class SignalAwaiterReusable : ICriticalNotifyCompletion
     {
         private Action _continuation;
         private bool _result;
         readonly CancellationToken token;
         public IEnumerator enumerator;
+        public WaitForSeconds wait {get;set;}
         public void AssignEnumerator(System.Collections.IEnumerator enumerator)
         {
             this.enumerator = enumerator;
@@ -219,13 +221,25 @@ namespace VAwait
             }
             finally
             {
-                Wait.runtimeInstance.component.TriggerFrameCoroutineReusable(this);
+                if(!token.IsCancellationRequested)
+                {
+                    Wait.runtimeInstance.component.TriggerSecondsCoroutineReusable(wait, this);
+                }
             }
         }
 
         public void UnsafeOnCompleted(Action continuation)
         {
             _continuation = continuation;
+        }
+        public void Cancel()
+        {
+            if(enumerator != null)
+            {
+                Wait.runtimeInstance.component.CancelCoroutine(enumerator);
+            }
+
+            Reset();
         }
     }
 }
