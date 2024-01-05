@@ -19,6 +19,12 @@ async Task AsyncMethod()
    //Wait for Coroutines
    await Wait.Coroutine(MyCoroutine());
 
+   //Wait until condition met.
+   //Cancel the token source to stop awaiting.
+
+   bool a = false;
+   await Wait.WaitUntil(x=> a == true, myTokenSource);
+
    //Awaiting more than once.
    //By default the SignalAwaiter can't do this due to object pooling.
    //We can use the SignalAwaiterReusable for this use case.
@@ -40,6 +46,15 @@ async Task AsyncMethod()
    //Canceling an await
    await Wait.NextSeconds(10f, setId: 2);
    Wait.TryCancel(2);
+
+   //PeriodicTimer. Similar beavior like the PeriodicTimer in c#.
+   //maxTickCount must be set to break from the timer.
+   //Cancel the token source that's passed.
+
+   await Wait.PeriodicTimer(interval : 5f, maxTickCount : 10, (tick)=>
+   {
+     Debug.Log(tick);
+   }, myTokenSource);
 }
 ```
 # Note :  
