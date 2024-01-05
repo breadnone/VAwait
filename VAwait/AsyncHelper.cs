@@ -203,22 +203,12 @@ namespace VAwait
         /// <summary>
         /// Cancels an await.
         /// </summary>
-        public static void Cancel(this SignalAwaiter signal, int id)
+        public static void TryCancel(int id)
         {
-            bool wasFound = false;
-
-            foreach (var ins in signalPool)
+            if (setIdd.TryGetValue(id, out var func))
             {
-                if (id > -1 && ins.GetSetId == id)
-                {
-                    wasFound = true;
-                    break;
-                }
-            }
-
-            if (!wasFound)
-            {
-                ReturnAwaiterToPool(signal);
+                func.Cancel();
+                ReturnAwaiterToPool(func);
             }
         }
         /// <summary>
