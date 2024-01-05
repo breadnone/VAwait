@@ -53,7 +53,7 @@ namespace VAwait
 
             for(int i = 0; i < poolLength; i++)
             {
-                var ins = new SignalAwaiter();
+                var ins = new SignalAwaiter(vawaitTokenSource);
                 signalPool.Enqueue(ins);
             }
         }
@@ -68,7 +68,7 @@ namespace VAwait
                 return ins;
             }
 
-            var nins = new SignalAwaiter();
+            var nins = new SignalAwaiter(vawaitTokenSource);
             return nins;
         }
         /// <summary>
@@ -130,7 +130,7 @@ namespace VAwait
             }
 
             var ins = GetPooled();
-            (ins as IVSignal).GetSetId = setId;
+            ins.GetSetId = setId;
 
             setIdd.TryAdd(setId, ins);
             _= WaitSeconds(duration, ins);
@@ -145,7 +145,7 @@ namespace VAwait
         {
             var ins = GetPooled();
             
-            (ins as IVSignal).AssignEnumerator(coroutine);
+            ins.AssignEnumerator(coroutine);
             runtimeInstance.component.TriggerCoroutine(coroutine, ins);
             return ins;
         }
@@ -167,12 +167,6 @@ namespace VAwait
         static async ValueTask WaitSeconds(float duration, SignalAwaiter signal)
         {
             await Task.Delay(TimeSpan.FromSeconds(duration));
-
-            if(signal.cancelled || vawaitTokenSource.IsCancellationRequested)
-            {
-                return;
-            }
-
             runtimeInstance.component.TriggerFrameCoroutine(signal);
         }
         /// <summary>
@@ -228,7 +222,7 @@ namespace VAwait
 
             foreach(var ins in signalPool)
             {
-                if(id > -1 && (ins as IVSignal).GetSetId == id)
+                if(id > -1 && ins.GetSetId == id)
                 {
                     wasFound = true;
                     break;
@@ -257,9 +251,18 @@ namespace VAwait
                 vawaitTokenSource = null;
             }
         }
+
         public static (VWaitComponent component, GameObject gameObject) GetRuntimeInstance()
         {
             return runtimeInstance;
+        }
+        //This token can't be cancelled can't be cancelled
+        public static CancellationToken GetToken
+        {
+            get
+            {
+                return vawaitTokenSource.Token;
+            }
         }
     }
 

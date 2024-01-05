@@ -1,30 +1,33 @@
 using System;
-using System.Threading;
 using System.Runtime.CompilerServices;
 using System.Collections;
+using System.Threading;
 
 namespace VAwait
 {
-    public interface IVSignal
-    {
-        public void AssignEnumerator(IEnumerator enumerator);
-        public int GetSetId {get;set;}
-    }
-    public class SignalAwaiter : INotifyCompletion, IVSignal
+    /// <summary>
+    /// Awaiter class.
+    /// </summary>/.
+    public class SignalAwaiter : ICriticalNotifyCompletion
     {
         private Action _continuation;
         private bool _result;
+        readonly CancellationToken token;
         public bool cancelled{get;private set;}
         public IEnumerator enumerator { get; private set; }
-        int IVSignal.GetSetId{get;set;} = -1;
-
+        public int GetSetId{get;set;} = -1;
         public bool IsCompleted
         {
             get;
             private set;
         }
 
-        void IVSignal.AssignEnumerator(System.Collections.IEnumerator enumerator)
+        public SignalAwaiter(CancellationTokenSource cts)
+        {
+            token = cts.Token;
+        }
+
+        public void AssignEnumerator(System.Collections.IEnumerator enumerator)
         {
             this.enumerator = enumerator;
         }
@@ -36,19 +39,15 @@ namespace VAwait
 
         public void OnCompleted(Action continuation)
         {
-            if (Check)
+            if(token.IsCancellationRequested)
             {
                 return;
             }
-
+            
             if (_continuation != null)
                 throw new InvalidOperationException("VAwait Error : Is already being awaited");
 
             _continuation = continuation;
-        }
-        bool Check
-        {
-            get{return cancelled || Wait.vawaitTokenSource == null || Wait.vawaitTokenSource.IsCancellationRequested;}
         }
 
         /// <summary>
@@ -58,11 +57,11 @@ namespace VAwait
         /// <returns></returns>
         public bool TrySetResult(bool result)
         {
-            if (Check)
+            if(cancelled || token.IsCancellationRequested)
             {
                 return false;
             }
-
+            
             if (!this.IsCompleted)
             {
                 this.IsCompleted = true;
@@ -81,21 +80,16 @@ namespace VAwait
         /// <returns></returns>
         public SignalAwaiter Reset()
         {
+            if(token.IsCancellationRequested)
+            {
+                return this;
+            }
+            
             Cancel();
             this._result = false;
             this._continuation = null;
             this.IsCompleted = false;
-            this.enumerator = null;
-            this.cancelled = false;
-
-            var isig = this as IVSignal;
-
-            if(isig.GetSetId > -1)
-            {
-                Wait.RemoveIDD(isig.GetSetId);
-                isig.GetSetId = -1;
-            }
-            
+            this.cancelled = false;            
             return this;
         }
 
@@ -112,7 +106,18 @@ namespace VAwait
             {
                 Wait.GetRuntimeInstance().component.CancelCoroutine(enumerator);
                 enumerator = null;
-            }            
+            }
+
+            if(GetSetId > -1)
+            {
+                Wait.RemoveIDD(GetSetId);
+                GetSetId = -1;
+            }
+        }
+
+        public void UnsafeOnCompleted(Action continuation)
+        {
+            _continuation = continuation;
         }
     }
 }
