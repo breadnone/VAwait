@@ -37,8 +37,7 @@ namespace VAwait
                 {
                     if(signalPool.TryDequeue(out var func))
                     {
-                        func.Reset(true, true);
-                        (func as IVSignal).AssignTokenSource(null);
+                        func.Reset();
                     }
                 }
             }
@@ -54,9 +53,7 @@ namespace VAwait
 
             for(int i = 0; i < poolLength; i++)
             {
-                var ctoken = CancellationTokenSource.CreateLinkedTokenSource(vawaitTokenSource.Token);
                 var ins = new SignalAwaiter();
-                (ins as IVSignal).AssignTokenSource(ctoken);
                 signalPool.Enqueue(ins);
             }
         }
@@ -72,8 +69,6 @@ namespace VAwait
             }
 
             var nins = new SignalAwaiter();
-            var ctoken = CancellationTokenSource.CreateLinkedTokenSource(vawaitTokenSource.Token);
-            (ins as IVSignal).AssignTokenSource(ctoken);
             return nins;
         }
         /// <summary>
@@ -82,14 +77,11 @@ namespace VAwait
         /// <param name="signal"></param>
         public static void ReturnAwaiterToPool(SignalAwaiter signal)
         {
+            signal.Reset();
+
             if(signalPool.Count < poolLength)
             {
-                signal.Reset(false, false);
                 signalPool.Enqueue(signal);
-            }
-            else
-            {
-                signal.Cancel(false, true);
             }
         }
         /// <summary>
@@ -99,7 +91,7 @@ namespace VAwait
         public static SignalAwaiter NextFrame()
         {
             var ins = GetPooled();
-            runtimeInstance.component.TriggerFrameCoroutine(ins, ins.tokenSource);
+            runtimeInstance.component.TriggerFrameCoroutine(ins);
             return ins;
         }
         /// <summary>
@@ -154,7 +146,7 @@ namespace VAwait
             var ins = GetPooled();
             
             (ins as IVSignal).AssignEnumerator(coroutine);
-            runtimeInstance.component.TriggerCoroutine(coroutine, ins, ins.tokenSource);
+            runtimeInstance.component.TriggerCoroutine(coroutine, ins);
             return ins;
         }
         /// <summary>
@@ -174,14 +166,14 @@ namespace VAwait
         }
         static async ValueTask WaitSeconds(float duration, SignalAwaiter signal)
         {
-            await Task.Delay(TimeSpan.FromSeconds(duration), signal.tokenSource.Token);
+            await Task.Delay(TimeSpan.FromSeconds(duration));
 
-            if(signal.tokenSource.IsCancellationRequested)
+            if(signal.cancelled || vawaitTokenSource.IsCancellationRequested)
             {
                 return;
             }
 
-            runtimeInstance.component.TriggerFrameCoroutine(signal, signal.tokenSource);
+            runtimeInstance.component.TriggerFrameCoroutine(signal);
         }
         /// <summary>
         /// Runs and switch to threadPool.
@@ -205,7 +197,7 @@ namespace VAwait
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 func?.Invoke(true);
-                runtimeInstance.component.TriggerFrameCoroutine(ins, ins.tokenSource);
+                runtimeInstance.component.TriggerFrameCoroutine(ins);
             });
 
             return ins;
@@ -222,7 +214,7 @@ namespace VAwait
             unityContext.Post(_ =>
             {
                 func?.Invoke();
-                runtimeInstance.component.TriggerFrameCoroutine(ins, ins.tokenSource);
+                runtimeInstance.component.TriggerFrameCoroutine(ins);
             }, null);
             return ins;
         }

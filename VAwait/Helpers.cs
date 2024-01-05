@@ -7,7 +7,6 @@ namespace VAwait
 {
     public interface IVSignal
     {
-        public void AssignTokenSource(CancellationTokenSource tokenSource);
         public void AssignEnumerator(IEnumerator enumerator);
         public int GetSetId {get;set;}
     }
@@ -15,7 +14,7 @@ namespace VAwait
     {
         private Action _continuation;
         private bool _result;
-        public CancellationTokenSource tokenSource { get; private set; }
+        public bool cancelled{get;private set;}
         public IEnumerator enumerator { get; private set; }
         int IVSignal.GetSetId{get;set;} = -1;
 
@@ -25,11 +24,6 @@ namespace VAwait
             private set;
         }
 
-        void IVSignal.AssignTokenSource(CancellationTokenSource tokenSource)
-        {
-            this.tokenSource = tokenSource;
-        }
-
         void IVSignal.AssignEnumerator(System.Collections.IEnumerator enumerator)
         {
             this.enumerator = enumerator;
@@ -37,17 +31,12 @@ namespace VAwait
 
         public bool GetResult()
         {
-            if (tokenSource.IsCancellationRequested)
-            {
-                return false;
-            }
-
             return _result;
         }
 
         public void OnCompleted(Action continuation)
         {
-            if (tokenSource.IsCancellationRequested)
+            if (Check)
             {
                 return;
             }
@@ -57,6 +46,10 @@ namespace VAwait
 
             _continuation = continuation;
         }
+        bool Check
+        {
+            get{return cancelled || Wait.vawaitTokenSource == null || Wait.vawaitTokenSource.IsCancellationRequested;}
+        }
 
         /// <summary>
         /// Attempts to transition the completion state.
@@ -65,7 +58,7 @@ namespace VAwait
         /// <returns></returns>
         public bool TrySetResult(bool result)
         {
-            if (tokenSource.IsCancellationRequested)
+            if (Check)
             {
                 return false;
             }
@@ -86,13 +79,14 @@ namespace VAwait
         /// Reset the awaiter to initial status
         /// </summary>
         /// <returns></returns>
-        public SignalAwaiter Reset(bool cancelToken, bool dispose)
+        public SignalAwaiter Reset()
         {
-            Cancel(cancelToken, dispose);
+            Cancel();
             this._result = false;
             this._continuation = null;
             this.IsCompleted = false;
             this.enumerator = null;
+            this.cancelled = false;
 
             var isig = this as IVSignal;
 
@@ -110,24 +104,15 @@ namespace VAwait
             return this;
         }
 
-        public void Cancel(bool renewTokenSource, bool dispose, bool reset = false)
+        public void Cancel()
         {
+            cancelled = true;
+
             if(enumerator != null)
             {
                 Wait.GetRuntimeInstance().component.CancelCoroutine(enumerator);
                 enumerator = null;
-            }
-
-            if (dispose)
-            {
-                tokenSource.Cancel();
-                tokenSource.Dispose();
-            }
-
-            if (renewTokenSource)
-            {
-                tokenSource = CancellationTokenSource.CreateLinkedTokenSource(Wait.vawaitTokenSource.Token);
-            }
+            }            
         }
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using System.Threading;
+using System;
 
 namespace VAwait
 {
@@ -24,51 +25,36 @@ namespace VAwait
             }
         }
 
-        IEnumerator InstanceCoroutineSeconds(float duration, SignalAwaiter signal, CancellationTokenSource cts)
+        IEnumerator InstanceCoroutineSeconds(float duration, SignalAwaiter signal)
         {
             yield return new WaitForSeconds(duration);
-
-            if (!cts.IsCancellationRequested)
-            {
-                signal.TrySetResult(true);
-            }
-
+            signal.TrySetResult(true);
             Wait.ReturnAwaiterToPool(signal);
         }
-        IEnumerator InstanceCoroutineFrame(SignalAwaiter signal, CancellationTokenSource cts)
+        IEnumerator InstanceCoroutineFrame(SignalAwaiter signal)
         {
             yield return null;
-
-            if (!cts.IsCancellationRequested)
-            {
-                signal.TrySetResult(true);    
-            }
-
+            signal.TrySetResult(true);
             Wait.ReturnAwaiterToPool(signal);
         }
-        IEnumerator InstanceCoroutine(IEnumerator coroutine, SignalAwaiter signal, CancellationTokenSource cts)
+        IEnumerator InstanceCoroutine(IEnumerator coroutine, SignalAwaiter signal)
         {
             yield return coroutine;
-
-            if (!cts.IsCancellationRequested)
-            {
-                signal.TrySetResult(true);    
-            }
-
+            signal.TrySetResult(true);    
             Wait.ReturnAwaiterToPool(signal);
 
         }
-        public void TriggerFrameCoroutine(SignalAwaiter signal, CancellationTokenSource cts)
+        public void TriggerFrameCoroutine(SignalAwaiter signal)
         {
-            StartCoroutine(InstanceCoroutineFrame(signal, cts));
+            StartCoroutine(InstanceCoroutineFrame(signal));
         }
-        public void TriggerSecondsCoroutine(ref float duration, SignalAwaiter signal, CancellationTokenSource cts)
+        public void TriggerSecondsCoroutine(ref float duration, SignalAwaiter signal)
         {
-            StartCoroutine(InstanceCoroutineSeconds(duration, signal, cts));
+            StartCoroutine(InstanceCoroutineSeconds(duration, signal));
         }
-        public void TriggerCoroutine(IEnumerator coroutine, SignalAwaiter signal, CancellationTokenSource cts)
+        public void TriggerCoroutine(IEnumerator coroutine, SignalAwaiter signal)
         {
-            StartCoroutine(InstanceCoroutine(coroutine, signal, cts));
+            StartCoroutine(InstanceCoroutine(coroutine, signal));
         }
         public void CancelCoroutines()
         {
