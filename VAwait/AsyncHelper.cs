@@ -60,7 +60,6 @@ namespace VAwait
         /// <summary>
         /// Gets an instance of SignalAwaiter from the pool.
         /// </summary>
-        /// <returns></returns>
         static SignalAwaiter GetPooled()
         {
             if (signalPool.TryDequeue(out var ins))
@@ -120,9 +119,18 @@ namespace VAwait
             return ins;
         }
         /// <summary>
+        /// Unscaled reusable awaiter that can be awaited multiple times.Unlike NextFrameReusable, a CancellationTokenSource must be provided.
+        /// </summary>
+        /// <param name="cts">Token source.</param>
+        public static SignalAwaiterReusable SecondsReusableRealtime(float time, CancellationTokenSource cancellationTokenSource)
+        {
+            var ins = new SignalAwaiterReusable(cancellationTokenSource);
+            ins.waitRealtime = new WaitForSecondsRealtime(time);
+            return ins;
+        }
+        /// <summary>
         /// Awaits for the next FixedUpdate.
         /// </summary>
-        /// <returns></returns>
         public static SignalAwaiter FixedUpdate()
         {
             var ins = GetPooled();
@@ -145,7 +153,6 @@ namespace VAwait
         /// Waits for n duration in seconds.
         /// </summary>
         /// <param name="duration"></param>
-        /// <returns></returns>
         public static SignalAwaiter Seconds(float duration)
         {
             var ins = GetPooled();
@@ -156,7 +163,6 @@ namespace VAwait
         /// Waits for n duration in seconds.
         /// </summary>
         /// <param name="duration"></param>
-        /// <returns></returns>
         public static SignalAwaiter Seconds(float duration, int setId)
         {
             if (setId < 0)
@@ -175,7 +181,6 @@ namespace VAwait
         /// Waits for coroutine.
         /// </summary>
         /// <param name="coroutine"></param>
-        /// <returns></returns>
         public static SignalAwaiter Coroutine(IEnumerator coroutine)
         {
             var ins = GetPooled();
@@ -204,7 +209,7 @@ namespace VAwait
         /// </summary>
         static async ValueTask WaitSeconds(float duration, SignalAwaiter signal)
         {
-            await Task.Delay(TimeSpan.FromSeconds(duration), vawaitTokenSource.Token);
+            await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
             runtimeInstance.component.TriggerFrameCoroutine(signal);
         }
         /// <summary>
@@ -212,7 +217,6 @@ namespace VAwait
         /// </summary>
         /// <param name="predicate">Condition.</param>
         /// <param name="tokenSource">The token source.</param>
-        /// <returns></returns>
         static async ValueTask WaitUntil(Predicate<bool> predicate , CancellationTokenSource tokenSource)
         {
             var frame = NextFrameReusable();
@@ -232,6 +236,11 @@ namespace VAwait
         /// </summary>
         static async ValueTask PeriodicTimer(float interval, int maxTickCount, Action<int> tick, CancellationTokenSource tokenSource)
         {
+            if(maxTickCount < 1)
+            {
+                throw new Exception("VAwait Error : maxTickCount can't be less than 1.");
+            }
+
             int count = 0;
             var frame = NextFrameReusable();
 

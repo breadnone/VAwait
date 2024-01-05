@@ -54,8 +54,6 @@ namespace VAwait
         /// <summary>
         /// Attempts to transition the completion state.
         /// </summary>
-        /// <param name="result"></param>
-        /// <returns></returns>
         public bool TrySetResult(bool result)
         {
             if (cancelled || token.IsCancellationRequested)
@@ -78,7 +76,6 @@ namespace VAwait
         /// <summary>
         /// Reset the awaiter to initial status
         /// </summary>
-        /// <returns></returns>
         public SignalAwaiter Reset()
         {
             if (token.IsCancellationRequested)
@@ -132,6 +129,7 @@ namespace VAwait
         readonly CancellationToken token;
         public IEnumerator enumerator;
         public WaitForSeconds wait {get;set;}
+        public WaitForSecondsRealtime waitRealtime {get;set;}
         public void AssignEnumerator(System.Collections.IEnumerator enumerator)
         {
             this.enumerator = enumerator;
@@ -168,8 +166,6 @@ namespace VAwait
         /// <summary>
         /// Attempts to transition the completion state.
         /// </summary>
-        /// <param name="result"></param>
-        /// <returns></returns>
         public bool TrySetResult(bool result)
         {
             if (token.IsCancellationRequested)
@@ -193,7 +189,6 @@ namespace VAwait
         /// <summary>
         /// Reset the awaiter to initial status
         /// </summary>
-        /// <returns></returns>
         public SignalAwaiterReusable Reset()
         {
             if (token.IsCancellationRequested)
@@ -223,7 +218,14 @@ namespace VAwait
             {
                 if(!token.IsCancellationRequested)
                 {
-                    Wait.runtimeInstance.component.TriggerSecondsCoroutineReusable(wait, this);
+                    if(wait != null)
+                    {
+                        Wait.runtimeInstance.component.TriggerSecondsCoroutineReusable(wait, this);
+                    }
+                    else if(waitRealtime != null)
+                    {
+                        Wait.runtimeInstance.component.TriggerSecondsCoroutineReusableRealtime(waitRealtime, this);
+                    }
                 }
             }
         }

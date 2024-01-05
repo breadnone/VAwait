@@ -54,6 +54,11 @@ namespace VAwait
             yield return wait;
             signal.TrySetResult(true);
         }
+        IEnumerator InstanceCoroutineSecondsReusableRealtime(WaitForSecondsRealtime wait, SignalAwaiterReusable signal)
+        {
+            yield return wait;
+            signal.TrySetResult(true);
+        }
         IEnumerator InstanceCoroutine(IEnumerator coroutine, SignalAwaiter signal)
         {
             yield return coroutine;
@@ -75,6 +80,11 @@ namespace VAwait
         public void TriggerSecondsCoroutineReusable(WaitForSeconds wait, SignalAwaiterReusable signal)
         {
             signal.AssignEnumerator(InstanceCoroutineSecondsReusable(wait, signal));
+            StartCoroutine(signal.enumerator);
+        }
+        public void TriggerSecondsCoroutineReusableRealtime(WaitForSecondsRealtime wait, SignalAwaiterReusable signal)
+        {
+            signal.AssignEnumerator(InstanceCoroutineSecondsReusableRealtime(wait, signal));
             StartCoroutine(signal.enumerator);
         }
         public void TriggerCoroutine(IEnumerator coroutine, SignalAwaiter signal)
