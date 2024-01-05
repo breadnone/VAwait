@@ -11,13 +11,14 @@ namespace VAwait
 {
     public static class Wait
     {
-        public static CancellationTokenSource vawaitTokenSource {get; set;}
-        static (VWaitComponent component, GameObject gameObject) runtimeInstance;
+        static CancellationTokenSource vawaitTokenSource { get; set; }
+        public static (VWaitComponent component, GameObject gameObject) runtimeInstance;
         static ConcurrentQueue<SignalAwaiter> signalPool;
         static Dictionary<int, SignalAwaiter> setIdd = new();
-        public static UPlayStateMode playMode {get;set;} = UPlayStateMode.None;
-        public static int poolLength {get;set;} = 15;
-        public static SynchronizationContext unityContext{get;set;}
+        public static UPlayStateMode playMode { get; set; } = UPlayStateMode.None;
+        public static int poolLength { get; set; } = 15;
+        public static SynchronizationContext unityContext { get; set; }
+
         public static void RemoveIDD(int id)
         {
             setIdd.Remove(id);
@@ -31,17 +32,17 @@ namespace VAwait
         }
         static void PrepareAsyncHelper()
         {
-            if(vawaitTokenSource != null)
+            if (vawaitTokenSource != null)
             {
                 vawaitTokenSource.Cancel();
                 vawaitTokenSource.Dispose();
             }
 
-            if(signalPool != null && signalPool.Count > 0)
+            if (signalPool != null && signalPool.Count > 0)
             {
-                for(int i = 0; i < signalPool.Count; i++)
+                for (int i = 0; i < signalPool.Count; i++)
                 {
-                    if(signalPool.TryDequeue(out var func))
+                    if (signalPool.TryDequeue(out var func))
                     {
                         func.Cancel();
                     }
@@ -51,7 +52,7 @@ namespace VAwait
             vawaitTokenSource = new();
             signalPool = new ConcurrentQueue<SignalAwaiter>();
 
-            for(int i = 0; i < poolLength; i++)
+            for (int i = 0; i < poolLength; i++)
             {
                 var ins = new SignalAwaiter(vawaitTokenSource);
                 signalPool.Enqueue(ins);
@@ -63,7 +64,7 @@ namespace VAwait
         /// <returns></returns>
         static SignalAwaiter GetPooled()
         {
-            if(signalPool.TryDequeue(out var ins))
+            if (signalPool.TryDequeue(out var ins))
             {
                 return ins;
             }
@@ -79,20 +80,35 @@ namespace VAwait
         {
             signal.Reset();
 
-            if(signalPool.Count < poolLength)
+            if (signalPool.Count < poolLength)
             {
                 signalPool.Enqueue(signal);
             }
         }
         /// <summary>
-        /// Wait for next frame.
+        /// Wait for next frame. NCan't be awaited more than once.
         /// </summary>
-        /// <returns></returns>
         public static SignalAwaiter NextFrame()
         {
             var ins = GetPooled();
             runtimeInstance.component.TriggerFrameCoroutine(ins);
             return ins;
+        }
+        /// <summary>
+        /// Reusable awaiter, can be awaited multiple times.
+        /// </summary>
+        /// <returns></returns>
+        public static SignalAwaiterReusable NextFrameReusable()
+        {
+            return new SignalAwaiterReusable(vawaitTokenSource);
+        }
+        /// <summary>
+        /// Reusable awaiter, can be awaited multiple times.
+        /// </summary>
+        /// <returns></returns>
+        public static SignalAwaiterReusable SecondsReusable(float time)
+        {
+            return new SignalAwaiterReusable(vawaitTokenSource);
         }
         /// <summary>
         /// Fixed 1 frame value meant to be used for frame waiting while in edit-mode. This is not accurate,\njust a very rough estimation based on screen's refresh rate.
@@ -111,10 +127,10 @@ namespace VAwait
         /// </summary>
         /// <param name="duration"></param>
         /// <returns></returns>
-        public static SignalAwaiter Seconds (float duration)
+        public static SignalAwaiter Seconds(float duration)
         {
             var ins = GetPooled();
-            _= WaitSeconds(duration, ins);
+            _ = WaitSeconds(duration, ins);
             return ins;
         }
         /// <summary>
@@ -122,9 +138,9 @@ namespace VAwait
         /// </summary>
         /// <param name="duration"></param>
         /// <returns></returns>
-        public static SignalAwaiter Seconds (float duration, int setId)
+        public static SignalAwaiter Seconds(float duration, int setId)
         {
-            if(setId < 0)
+            if (setId < 0)
             {
                 throw new Exception("VAwait Error : Id can't be negative number");
             }
@@ -133,7 +149,7 @@ namespace VAwait
             ins.GetSetId = setId;
 
             setIdd.TryAdd(setId, ins);
-            _= WaitSeconds(duration, ins);
+            _ = WaitSeconds(duration, ins);
             return ins;
         }
         /// <summary>
@@ -141,10 +157,10 @@ namespace VAwait
         /// </summary>
         /// <param name="coroutine"></param>
         /// <returns></returns>
-        public static SignalAwaiter Coroutine (IEnumerator coroutine)
+        public static SignalAwaiter Coroutine(IEnumerator coroutine)
         {
             var ins = GetPooled();
-            
+
             ins.AssignEnumerator(coroutine);
             runtimeInstance.component.TriggerCoroutine(coroutine, ins);
             return ins;
@@ -156,7 +172,7 @@ namespace VAwait
         {
             PrepareAsyncHelper();
 
-            if(runtimeInstance.gameObject == null)
+            if (runtimeInstance.gameObject == null)
             {
                 var go = new GameObject();
                 go.name = "VAwait-instance";
@@ -220,16 +236,16 @@ namespace VAwait
         {
             bool wasFound = false;
 
-            foreach(var ins in signalPool)
+            foreach (var ins in signalPool)
             {
-                if(id > -1 && ins.GetSetId == id)
+                if (id > -1 && ins.GetSetId == id)
                 {
                     wasFound = true;
                     break;
                 }
             }
-            
-            if(!wasFound)
+
+            if (!wasFound)
             {
                 ReturnAwaiterToPool(signal);
             }
@@ -244,7 +260,7 @@ namespace VAwait
         /// </summary>
         public static void DestroyAwaits()
         {
-            if(vawaitTokenSource != null)
+            if (vawaitTokenSource != null)
             {
                 vawaitTokenSource.Cancel();
                 vawaitTokenSource.Dispose();
@@ -256,7 +272,7 @@ namespace VAwait
         {
             return runtimeInstance;
         }
-        //This token can't be cancelled can't be cancelled
+        //The life time of this token is based on your application's lifetime and can't be cancelled.
         public static CancellationToken GetToken
         {
             get

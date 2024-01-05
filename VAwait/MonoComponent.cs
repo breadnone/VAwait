@@ -37,6 +37,11 @@ namespace VAwait
             signal.TrySetResult(true);
             Wait.ReturnAwaiterToPool(signal);
         }
+        IEnumerator InstanceCoroutineFrameReusable(SignalAwaiterReusable signal)
+        {
+            yield return null;
+            signal.TrySetResult(true);
+        }
         IEnumerator InstanceCoroutine(IEnumerator coroutine, SignalAwaiter signal)
         {
             yield return coroutine;
@@ -46,6 +51,11 @@ namespace VAwait
         public void TriggerFrameCoroutine(SignalAwaiter signal)
         {
             StartCoroutine(InstanceCoroutineFrame(signal));
+        }
+        public void TriggerFrameCoroutineReusable(SignalAwaiterReusable signal)
+        {
+            signal.AssignEnumerator(InstanceCoroutineFrameReusable(signal));
+            StartCoroutine(signal.enumerator);
         }
         public void TriggerSecondsCoroutine(ref float duration, SignalAwaiter signal)
         {
