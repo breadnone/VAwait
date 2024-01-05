@@ -12,6 +12,9 @@ async Task AsyncMethod()
    
    //Wait for frames
    await Wait.NextFrame();
+
+   //Wait for FixedUpdate
+   await Wait.FixedUpdate();
    
    //Wait for Coroutines
    await Wait.Coroutine(MyCoroutine());
