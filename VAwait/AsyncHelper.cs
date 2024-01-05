@@ -196,8 +196,28 @@ namespace VAwait
         /// </summary>
         static async ValueTask WaitSeconds(float duration, SignalAwaiter signal)
         {
-            await Task.Delay(TimeSpan.FromSeconds(duration));
+            await Task.Delay(TimeSpan.FromSeconds(duration), vawaitTokenSource.Token);
             runtimeInstance.component.TriggerFrameCoroutine(signal);
+        }
+        /// <summary>
+        /// Waits until Predicate<bool> is True.
+        /// </summary>
+        /// <param name="predicate"></param>
+        /// <param name="tokenSource"></param>
+        /// <returns></returns>
+        static async ValueTask WaitUntil(Predicate<bool> predicate , CancellationTokenSource tokenSource)
+        {
+            var frame = NextFrameReusable();
+
+            while(predicate.Invoke(false))
+            {
+                await frame;
+                
+                if(tokenSource.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
         }
 
         /// <summary>
