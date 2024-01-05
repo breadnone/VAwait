@@ -17,7 +17,6 @@ namespace VAwait
         static Dictionary<int, SignalAwaiter> setIdd = new();
         public static UPlayStateMode playMode { get; set; } = UPlayStateMode.None;
         public static int poolLength { get; set; } = 15;
-        public static SynchronizationContext unityContext { get; set; }
 
         public static void RemoveIDD(int id)
         {
