@@ -86,12 +86,21 @@ namespace VAwait
             }
         }
         /// <summary>
-        /// Wait for next frame. NCan't be awaited more than once.
+        /// Wait for next frame. Can't be awaited more than once.
         /// </summary>
         public static SignalAwaiter NextFrame()
         {
             var ins = GetPooled();
             runtimeInstance.component.TriggerFrameCoroutine(ins);
+            return ins;
+        }
+        /// <summary>
+        /// Wait until end of frame. Can't be awaited more than once.
+        /// </summary>
+        public static SignalAwaiter EndOfFrame()
+        {
+            var ins = GetPooled();
+            runtimeInstance.component.TriggerEndFrame(ins);
             return ins;
         }
         /// <summary>
@@ -200,10 +209,10 @@ namespace VAwait
             runtimeInstance.component.TriggerFrameCoroutine(signal);
         }
         /// <summary>
-        /// Waits until Predicate<bool> is True.
+        /// Waits until Predicate<bool> is True. Can't be awaited multiple times.
         /// </summary>
-        /// <param name="predicate"></param>
-        /// <param name="tokenSource"></param>
+        /// <param name="predicate">Condition.</param>
+        /// <param name="tokenSource">The token source.</param>
         /// <returns></returns>
         static async ValueTask WaitUntil(Predicate<bool> predicate , CancellationTokenSource tokenSource)
         {
@@ -219,7 +228,35 @@ namespace VAwait
                 }
             }
         }
+        /// <summary>
+        /// Behaves similar to PeriodicTimer in c#. Tick count will increase the next frame.
+        /// </summary>
+        static async ValueTask PeriodicTimer(float interval, Action<int> tick, CancellationTokenSource tokenSource)
+        {
+            int count = 0;
+            var frame = NextFrameReusable();
 
+            while(true)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(interval), tokenSource.Token);
+                
+                if(tokenSource.IsCancellationRequested)
+                {
+                    var ins = GetPooled();
+                    runtimeInstance.component.TriggerFrameCoroutine(ins);
+                    break;
+                }
+
+                await frame;
+
+                if(vawaitTokenSource.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                tick.Invoke(count++);
+            }
+        }
         /// <summary>
         /// Cancels an await.
         /// </summary>

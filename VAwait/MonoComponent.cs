@@ -11,9 +11,12 @@ namespace VAwait
     {
         static VWaitComponent mono { get; set; }
         WaitForFixedUpdate waitFixed;
-        void OnEnable()
+        WaitForEndOfFrame endOfFrame;
+        WaitForSecondsRealtime realtime;
+        void Awake()
         {
             waitFixed = new WaitForFixedUpdate();
+            endOfFrame = new WaitForEndOfFrame();
             DontDestroyOnLoad(this.gameObject);
         }
 
@@ -28,10 +31,9 @@ namespace VAwait
                 GameObject.Destroy(this);
             }
         }
-
-        IEnumerator InstanceCoroutineSeconds(float duration, SignalAwaiter signal)
+        IEnumerator InstanceEndFrame(SignalAwaiter signal)
         {
-            yield return new WaitForSeconds(duration);
+            yield return endOfFrame;
             signal.TrySetResult(true);
             Wait.ReturnAwaiterToPool(signal);
         }
@@ -46,11 +48,6 @@ namespace VAwait
             yield return waitFixed;
             signal.TrySetResult(true);
             Wait.ReturnAwaiterToPool(signal);
-        }
-        IEnumerator InstanceCoroutineFrameReusable(SignalAwaiterReusable signal)
-        {
-            yield return null;
-            signal.TrySetResult(true);
         }
         IEnumerator InstanceCoroutineSecondsReusable(WaitForSeconds wait, SignalAwaiterReusable signal)
         {
@@ -71,10 +68,9 @@ namespace VAwait
         {
             StartCoroutine(InstanceCoroutineFrame(signal));
         }
-        public void TriggerFrameCoroutineReusable(SignalAwaiterReusable signal)
+        public void TriggerEndFrame(SignalAwaiter signal)
         {
-            signal.AssignEnumerator(InstanceCoroutineFrameReusable(signal));
-            StartCoroutine(signal.enumerator);
+            StartCoroutine(InstanceEndFrame(signal));
         }
         public void TriggerSecondsCoroutineReusable(WaitForSeconds wait, SignalAwaiterReusable signal)
         {
@@ -97,6 +93,7 @@ namespace VAwait
         void OnApplicationQuit()
         {
             Wait.DestroyAwaits();
+            CancelCoroutines();
         }
     }
 }
