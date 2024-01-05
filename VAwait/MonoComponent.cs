@@ -81,10 +81,6 @@ namespace VAwait
             signal.AssignEnumerator(InstanceCoroutineSecondsReusable(wait, signal));
             StartCoroutine(signal.enumerator);
         }
-        public void TriggerSecondsCoroutine(ref float duration, SignalAwaiter signal)
-        {
-            StartCoroutine(InstanceCoroutineSeconds(duration, signal));
-        }
         public void TriggerCoroutine(IEnumerator coroutine, SignalAwaiter signal)
         {
             StartCoroutine(InstanceCoroutine(coroutine, signal));

@@ -191,53 +191,13 @@ namespace VAwait
                 runtimeInstance = (go.GetComponent<VWaitComponent>(), go);
             }
         }
+        /// <summary>
+        /// Internal use for wait for Seconds.
+        /// </summary>
         static async ValueTask WaitSeconds(float duration, SignalAwaiter signal)
         {
             await Task.Delay(TimeSpan.FromSeconds(duration));
             runtimeInstance.component.TriggerFrameCoroutine(signal);
-        }
-        /// <summary>
-        /// Runs and switch to threadPool.
-        /// </summary>
-        /// <param name="func">Delegate.</param>
-        public static void RunOnThreadpool(Action func)
-        {
-            ThreadPool.QueueUserWorkItem(_ =>
-            {
-                func.Invoke();
-            });
-        }
-        /// <summary>
-        /// Runs and awaits from threadPool.
-        /// </summary>
-        /// <param name="func">Delegate.</param>
-        public static SignalAwaiter RunOnThreadpool(Action<bool> func)
-        {
-            var ins = GetPooled();
-
-            ThreadPool.QueueUserWorkItem(_ =>
-            {
-                func?.Invoke(true);
-                runtimeInstance.component.TriggerFrameCoroutine(ins);
-            });
-
-            return ins;
-        }
-        /// <summary>
-        /// Invokes on mainthread. Can be used to get out of threadPool.
-        /// </summary>
-        /// <param name="func">Delegate.</param>
-        public static SignalAwaiter BeginInvokeOnMainthread(Action func)
-        {
-            var ins = GetPooled();
-
-            // Send a callback to the main thread
-            unityContext.Post(_ =>
-            {
-                func?.Invoke();
-                runtimeInstance.component.TriggerFrameCoroutine(ins);
-            }, null);
-            return ins;
         }
 
         /// <summary>
@@ -261,6 +221,9 @@ namespace VAwait
                 ReturnAwaiterToPool(signal);
             }
         }
+        /// <summary>
+        /// Destroy and cancel awaits, will re-initialize.
+        /// </summary>
         public static void ForceCancelAll()
         {
             DestroyAwaits();
