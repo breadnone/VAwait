@@ -231,12 +231,12 @@ namespace VAwait
         /// <summary>
         /// Behaves similar to PeriodicTimer in c#. Tick count will increase the next frame.
         /// </summary>
-        static async ValueTask PeriodicTimer(float interval, Action<int> tick, CancellationTokenSource tokenSource)
+        static async ValueTask PeriodicTimer(float interval, int maxTickCount, Action<int> tick, CancellationTokenSource tokenSource)
         {
             int count = 0;
             var frame = NextFrameReusable();
 
-            while(true)
+            while(maxTickCount != count)
             {
                 await Task.Delay(TimeSpan.FromSeconds(interval), tokenSource.Token);
                 
@@ -253,8 +253,9 @@ namespace VAwait
                 {
                     return;
                 }
-
-                tick.Invoke(count++);
+                
+                count++;
+                tick.Invoke(count);
             }
         }
         /// <summary>
