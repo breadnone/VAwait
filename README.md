@@ -7,7 +7,6 @@
 ```
 async Task AsyncMethod()
 {
-
    //Wait for seconds
    await Wait.Seconds(5f);
    
@@ -16,6 +15,21 @@ async Task AsyncMethod()
    
    //Wait for Coroutines
    await Wait.Coroutine(MyCoroutine());
+
+  //Awaiting more than once.
+  //By default the SignalAwaiter can't do this due to object pooling.
+  //We can use the SignalAwaiterReusable for this use case.
+
+  var tokenSource = new CancellationTokenSource();
+  var frame = Wait.NextFrameReusable();
+  var second = Wait.SecondsReusable(tokenSource); // Token source must be passed for canceling purposes
+
+  while(true)
+  {
+    //Will be reusing the same instance or awaited multiple times.
+    await frame;
+    await second;
+  }
    
    //Canceling an await
    await Wait.NextSeconds(10f, setId: 2);
@@ -38,5 +52,5 @@ ThreadPool ==========================================
 }
 ```
 # Note :  
-- The SignalAwaiter instances can't be awaited multiple times.
+- The SignalAwaiter instances can't be awaited multiple times. Use NextFrameReusable or SecondsReusable for when you need to await it more than once.
 - Runtime only.
