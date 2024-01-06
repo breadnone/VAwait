@@ -226,11 +226,7 @@ namespace VAwait
             {
                 if(!token.IsCancellationRequested)
                 {
-                    if(waitType == VWaitType.Frame)
-                    {
-                        Wait.runtimeInstance.component.TriggerFrameCoroutineReusable(this);
-                    }
-                    else if(waitType == VWaitType.WaitSeconds)
+                    if(waitType == VWaitType.WaitSeconds)
                     {
                         Wait.runtimeInstance.component.TriggerSecondsCoroutineReusable(wait, this);
                     }
@@ -253,6 +249,105 @@ namespace VAwait
                 Wait.runtimeInstance.component.CancelCoroutine(enumerator);
             }
 
+            Reset();
+        }
+    }
+
+    public class SignalAwaiterReusableFrame : ICriticalNotifyCompletion
+    {
+        private Action _continuation;
+        private bool _result;
+        readonly CancellationToken token;
+        public IEnumerator enumerator;
+        public bool IsCompleted
+        {
+            get;
+            private set;
+        }
+
+        public SignalAwaiterReusableFrame(CancellationTokenSource cts)
+        {
+            token = cts.Token;
+        }
+
+        public bool GetResult()
+        {
+            return _result;
+        }
+
+        public void OnCompleted(Action continuation)
+        {
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (_continuation != null)
+                throw new InvalidOperationException("VAwait Error : Is already being awaited");
+
+            _continuation = continuation;
+        }
+
+        /// <summary>
+        /// Attempts to transition the completion state.
+        /// </summary>
+        public bool TrySetResult(bool result)
+        {
+            if (token.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            if (!this.IsCompleted)
+            {
+                this.IsCompleted = true;
+                this._result = result;
+                enumerator = null;
+                _continuation?.Invoke();
+                
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Reset the awaiter to initial status
+        /// </summary>
+        public SignalAwaiterReusableFrame Reset()
+        {
+            if (token.IsCancellationRequested)
+            {
+                return this;
+            }
+
+            this._result = false;
+            this._continuation = null;
+            this.IsCompleted = false;
+            enumerator = null;
+            return this;
+        }
+        public SignalAwaiterReusableFrame GetAwaiter()
+        {            
+            try
+            {
+                return Reset();
+            }
+            finally
+            {
+                if(!token.IsCancellationRequested)
+                {
+                    Wait.runtimeInstance.component.TriggerFrameCoroutineReusable(this);
+                }
+            }
+        }
+
+        public void UnsafeOnCompleted(Action continuation)
+        {
+            _continuation = continuation;
+        }
+        public void Cancel()
+        {
             Reset();
         }
     }
