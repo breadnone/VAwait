@@ -6,6 +6,12 @@ using UnityEngine;
 
 namespace VAwait
 {
+    public enum VWaitType
+    {
+        Frame,
+        WaitSeconds,
+        WaitSecondsRealtime
+    }
     /// <summary>
     /// Awaiter class.
     /// </summary>
@@ -37,7 +43,7 @@ namespace VAwait
         {
             return _result;
         }
-
+ 
         public void OnCompleted(Action continuation)
         {
             if (token.IsCancellationRequested)
@@ -130,6 +136,7 @@ namespace VAwait
         public IEnumerator enumerator;
         public WaitForSeconds wait {get;set;}
         public WaitForSecondsRealtime waitRealtime {get;set;}
+        public VWaitType waitType {get;set;}
         public void AssignEnumerator(System.Collections.IEnumerator enumerator)
         {
             this.enumerator = enumerator;
@@ -143,6 +150,7 @@ namespace VAwait
         public SignalAwaiterReusable(CancellationTokenSource cts)
         {
             token = cts.Token;
+            this.waitType = waitType;
         }
 
         public bool GetResult()
@@ -218,11 +226,15 @@ namespace VAwait
             {
                 if(!token.IsCancellationRequested)
                 {
-                    if(wait != null)
+                    if(waitType == VWaitType.Frame)
+                    {
+                        Wait.runtimeInstance.component.TriggerFrameCoroutineReusable(this);
+                    }
+                    else if(waitType == VWaitType.WaitSeconds)
                     {
                         Wait.runtimeInstance.component.TriggerSecondsCoroutineReusable(wait, this);
                     }
-                    else if(waitRealtime != null)
+                    else
                     {
                         Wait.runtimeInstance.component.TriggerSecondsCoroutineReusableRealtime(waitRealtime, this);
                     }

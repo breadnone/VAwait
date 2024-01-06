@@ -106,7 +106,9 @@ namespace VAwait
         /// </summary>
         public static SignalAwaiterReusable NextFrameReusable()
         {
-            return new SignalAwaiterReusable(vawaitTokenSource);
+            var ins = new SignalAwaiterReusable(vawaitTokenSource);
+            ins.waitType = VWaitType.Frame; 
+            return ins;
         }
         /// <summary>
         /// Reusable awaiter that can be awaited multiple times.Unlike NextFrameReusable, a CancellationTokenSource must be provided.
@@ -115,6 +117,7 @@ namespace VAwait
         public static SignalAwaiterReusable SecondsReusable(float time, CancellationTokenSource cancellationTokenSource)
         {
             var ins = new SignalAwaiterReusable(cancellationTokenSource);
+            ins.waitType = VWaitType.WaitSeconds;
             ins.wait = new WaitForSeconds(time);
             return ins;
         }
@@ -125,6 +128,7 @@ namespace VAwait
         public static SignalAwaiterReusable SecondsReusableRealtime(float time, CancellationTokenSource cancellationTokenSource)
         {
             var ins = new SignalAwaiterReusable(cancellationTokenSource);
+            ins.waitType = VWaitType.WaitSecondsRealtime;
             ins.waitRealtime = new WaitForSecondsRealtime(time);
             return ins;
         }
