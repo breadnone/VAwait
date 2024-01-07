@@ -23,6 +23,7 @@ namespace VAwait
         public bool cancelled { get; private set; }
         public IEnumerator enumerator { get; private set; }
         public int GetSetId { get; set; } = -1;
+        public int frameIn {get; set;}
         public bool IsCompleted
         {
             get;
@@ -136,11 +137,13 @@ namespace VAwait
         public IEnumerator enumerator;
         public WaitForSeconds wait {get;set;}
         public WaitForSecondsRealtime waitRealtime {get;set;}
+        public int frameIn {get;set;}
         public VWaitType waitType {get;set;}
         public void AssignEnumerator(System.Collections.IEnumerator enumerator)
         {
             this.enumerator = enumerator;
         }
+
         public bool IsCompleted
         {
             get;
@@ -258,7 +261,7 @@ namespace VAwait
         private Action _continuation;
         private bool _result;
         readonly CancellationToken token;
-        public IEnumerator enumerator;
+        public int frameIn {get;set;}
         public bool IsCompleted
         {
             get;
@@ -277,11 +280,6 @@ namespace VAwait
 
         public void OnCompleted(Action continuation)
         {
-            if (token.IsCancellationRequested)
-            {
-                return;
-            }
-
             if (_continuation != null)
                 throw new InvalidOperationException("VAwait Error : Is already being awaited");
 
@@ -302,7 +300,6 @@ namespace VAwait
             {
                 this.IsCompleted = true;
                 this._result = result;
-                enumerator = null;
                 _continuation?.Invoke();
                 
                 return true;
@@ -314,24 +311,23 @@ namespace VAwait
         /// <summary>
         /// Reset the awaiter to initial status
         /// </summary>
-        public SignalAwaiterReusableFrame Reset()
+        public void Reset()
         {
             if (token.IsCancellationRequested)
             {
-                return this;
+                return;
             }
 
             this._result = false;
             this._continuation = null;
             this.IsCompleted = false;
-            enumerator = null;
-            return this;
         }
         public SignalAwaiterReusableFrame GetAwaiter()
         {            
             try
             {
-                return Reset();
+                Reset();
+                return this;
             }
             finally
             {

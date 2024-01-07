@@ -1,3 +1,23 @@
+/*
+MIT License
+
+Copyright 2023 Stevphanie Ricardo
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this
+software and associated documentation files (the "Software"), to deal in the Software
+without restriction, including without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -11,7 +31,7 @@ namespace VAwait
 {
     public static class Wait
     {
-        static CancellationTokenSource vawaitTokenSource { get; set; }
+        static CancellationTokenSource awaitTokenSource { get; set; }
         public static (VWaitComponent component, GameObject gameObject) runtimeInstance;
         static ConcurrentQueue<SignalAwaiter> signalPool;
         static Dictionary<int, SignalAwaiter> setIdd = new();
@@ -31,10 +51,10 @@ namespace VAwait
         }
         static void PrepareAsyncHelper()
         {
-            if (vawaitTokenSource != null)
+            if (awaitTokenSource != null)
             {
-                vawaitTokenSource.Cancel();
-                vawaitTokenSource.Dispose();
+                awaitTokenSource.Cancel();
+                awaitTokenSource.Dispose();
             }
 
             if (signalPool != null && signalPool.Count > 0)
@@ -48,12 +68,12 @@ namespace VAwait
                 }
             }
 
-            vawaitTokenSource = new();
+            awaitTokenSource = new();
             signalPool = new ConcurrentQueue<SignalAwaiter>();
 
             for (int i = 0; i < poolLength; i++)
             {
-                var ins = new SignalAwaiter(vawaitTokenSource);
+                var ins = new SignalAwaiter(awaitTokenSource);
                 signalPool.Enqueue(ins);
             }
         }
@@ -64,10 +84,12 @@ namespace VAwait
         {
             if (signalPool.TryDequeue(out var ins))
             {
+                Debug.Log("From POOL");
                 return ins;
             }
 
-            var nins = new SignalAwaiter(vawaitTokenSource);
+            Debug.Log("NNNOOOOOOOOOOOTT FROM POOL");
+            var nins = new SignalAwaiter(awaitTokenSource);
             return nins;
         }
         /// <summary>
@@ -89,8 +111,15 @@ namespace VAwait
         public static SignalAwaiter NextFrame()
         {
             var ins = GetPooled();
-            runtimeInstance.component.TriggerFrameCoroutine(ins);
-            return ins;
+            //runtimeInstance.component.TriggerFrameCoroutine(ins);
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                PlayerLoopUpdate.playerLoopUtil.QueueNextFrame(ins);
+            }
         }
         /// <summary>
         /// Wait until end of frame. Can't be awaited more than once.
@@ -98,17 +127,32 @@ namespace VAwait
         public static SignalAwaiter EndOfFrame()
         {
             var ins = GetPooled();
-            runtimeInstance.component.TriggerEndFrame(ins);
-            return ins;
+
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                //runtimeInstance.component.TriggerEndFrame(ins);
+                PlayerLoopUpdate.playerLoopUtil.QueueEndOfFrame(ins);
+            }
         }
         /// <summary>
         /// Reusable awaiter, can be awaited multiple times.
         /// </summary>
-        public static SignalAwaiterReusable NextFrameReusable()
+        public static SignalAwaiterReusableFrame NextFrameReusable()
         {
-            var ins = new SignalAwaiterReusable(vawaitTokenSource);
-            ins.waitType = VWaitType.Frame; 
-            return ins;
+            var ins = new SignalAwaiterReusableFrame(awaitTokenSource);
+
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                PlayerLoopUpdate.playerLoopUtil.QueueReusableNextFrame(ins);
+            }
         }
         /// <summary>
         /// Reusable awaiter that can be awaited multiple times.Unlike NextFrameReusable, a CancellationTokenSource must be provided.
@@ -138,8 +182,15 @@ namespace VAwait
         public static SignalAwaiter FixedUpdate()
         {
             var ins = GetPooled();
-            runtimeInstance.component.TriggerFixedUpdateCoroutine(ins);
-            return ins;
+            
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                runtimeInstance.component.TriggerFixedUpdateCoroutine(ins);
+            }
         }
         /// <summary>
         /// Fixed 1 frame value meant to be used for frame waiting while in edit-mode. This is not accurate,\njust a very rough estimation based on screen's refresh rate.
@@ -188,7 +239,6 @@ namespace VAwait
         public static SignalAwaiter Coroutine(IEnumerator coroutine)
         {
             var ins = GetPooled();
-
             ins.AssignEnumerator(coroutine);
             runtimeInstance.component.TriggerCoroutine(coroutine, ins);
             return ins;
@@ -214,14 +264,15 @@ namespace VAwait
         static async ValueTask WaitSeconds(float duration, SignalAwaiter signal)
         {
             await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
-            runtimeInstance.component.TriggerFrameCoroutine(signal);
+            PlayerLoopUpdate.playerLoopUtil.QueueEndOfFrame(signal);
+            //runtimeInstance.component.TriggerEndFrame(signal);
         }
         /// <summary>
         /// Waits until Predicate<bool> is True. Can't be awaited multiple times.
         /// </summary>
         /// <param name="predicate">Condition.</param>
         /// <param name="tokenSource">The token source.</param>
-        static async ValueTask WaitUntil(Predicate<bool> predicate , CancellationTokenSource tokenSource)
+        static async Task<bool> WaitUntil(Predicate<bool> predicate , CancellationTokenSource tokenSource)
         {
             var frame = NextFrameReusable();
 
@@ -231,9 +282,11 @@ namespace VAwait
                 
                 if(tokenSource.IsCancellationRequested)
                 {
-                    break;
+                    return false;
                 }
             }
+
+            return true;
         }
         /// <summary>
         /// Behaves similar to PeriodicTimer in c#. Tick count will increase the next frame.
@@ -255,13 +308,14 @@ namespace VAwait
                 if(tokenSource.IsCancellationRequested)
                 {
                     var ins = GetPooled();
-                    runtimeInstance.component.TriggerFrameCoroutine(ins);
+
+                    PlayerLoopUpdate.playerLoopUtil.QueueEndOfFrame(ins);
                     break;
                 }
 
                 await frame;
 
-                if(vawaitTokenSource.IsCancellationRequested)
+                if(awaitTokenSource.IsCancellationRequested)
                 {
                     return;
                 }
@@ -270,6 +324,7 @@ namespace VAwait
                 tick.Invoke(count);
             }
         }
+
         /// <summary>
         /// Cancels an await.
         /// </summary>
@@ -294,11 +349,11 @@ namespace VAwait
         /// </summary>
         public static void DestroyAwaits()
         {
-            if (vawaitTokenSource != null)
+            if (awaitTokenSource != null)
             {
-                vawaitTokenSource.Cancel();
-                vawaitTokenSource.Dispose();
-                vawaitTokenSource = null;
+                awaitTokenSource.Cancel();
+                awaitTokenSource.Dispose();
+                awaitTokenSource = null;
             }
         }
 
@@ -311,7 +366,7 @@ namespace VAwait
         {
             get
             {
-                return vawaitTokenSource.Token;
+                return awaitTokenSource.Token;
             }
         }
     }
