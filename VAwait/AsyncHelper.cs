@@ -84,11 +84,9 @@ namespace VAwait
         {
             if (signalPool.TryDequeue(out var ins))
             {
-                Debug.Log("From POOL");
                 return ins;
             }
 
-            Debug.Log("NNNOOOOOOOOOOOTT FROM POOL");
             var nins = new SignalAwaiter(awaitTokenSource);
             return nins;
         }
@@ -143,45 +141,15 @@ namespace VAwait
         /// </summary>
         public static SignalAwaiterReusableFrame NextFrameReusable()
         {
-            var ins = new SignalAwaiterReusableFrame(awaitTokenSource);
+            return new SignalAwaiterReusableFrame(awaitTokenSource);
+        }
 
-            try
-            {
-                return ins;
-            }
-            finally
-            {
-                PlayerLoopUpdate.playerLoopUtil.QueueReusableNextFrame(ins);
-            }
-        }
-        /// <summary>
-        /// Reusable awaiter that can be awaited multiple times.Unlike NextFrameReusable, a CancellationTokenSource must be provided.
-        /// </summary>
-        /// <param name="cts">Token source.</param>
-        public static SignalAwaiterReusable SecondsReusable(float time, CancellationTokenSource cancellationTokenSource)
-        {
-            var ins = new SignalAwaiterReusable(cancellationTokenSource);
-            ins.waitType = VWaitType.WaitSeconds;
-            ins.wait = new WaitForSeconds(time);
-            return ins;
-        }
-        /// <summary>
-        /// Unscaled reusable awaiter that can be awaited multiple times.Unlike NextFrameReusable, a CancellationTokenSource must be provided.
-        /// </summary>
-        /// <param name="cts">Token source.</param>
-        public static SignalAwaiterReusable SecondsReusableRealtime(float time, CancellationTokenSource cancellationTokenSource)
-        {
-            var ins = new SignalAwaiterReusable(cancellationTokenSource);
-            ins.waitType = VWaitType.WaitSecondsRealtime;
-            ins.waitRealtime = new WaitForSecondsRealtime(time);
-            return ins;
-        }
         /// <summary>
         /// Awaits for the next FixedUpdate.
         /// </summary>
-        public static SignalAwaiter FixedUpdate()
+        public static SignalAwaiterReusableFrame FixedUpdate()
         {
-            var ins = GetPooled();
+            var ins = new SignalAwaiterReusableFrame(awaitTokenSource);
             
             try
             {
@@ -189,7 +157,8 @@ namespace VAwait
             }
             finally
             {
-                runtimeInstance.component.TriggerFixedUpdateCoroutine(ins);
+                PlayerLoopUpdate.playerLoopUtil.QueueFixedUpdate(ins);
+                //runtimeInstance.component.TriggerFixedUpdateCoroutine(ins);
             }
         }
         /// <summary>
@@ -211,8 +180,15 @@ namespace VAwait
         public static SignalAwaiter Seconds(float duration)
         {
             var ins = GetPooled();
-            _ = WaitSeconds(duration, ins);
-            return ins;
+            
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                _ = WaitSeconds(duration, ins);
+            }
         }
         /// <summary>
         /// Waits for n duration in seconds.

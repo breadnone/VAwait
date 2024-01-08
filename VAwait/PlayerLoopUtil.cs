@@ -8,42 +8,69 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Linq;
 using System.Threading;
+using System.Runtime.CompilerServices;
 
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 namespace VAwait
 {
-    public sealed class AwaitUpdate
-    {
-
-    }
-    public sealed class AwaitEndOfFrame
-    {
-
-    }
+    public sealed class AwaitUpdate { }
+    public sealed class AwaitEndOfFrame { }
+    public sealed class AwaitFixedUpdate { }
     public class PlayerLoopUpdate
     {
         PlayerLoopSystem playerLoop;
-        PlayerLoopSystem updateLoop;
-        public static PlayerLoopUpdate playerLoopUtil { get; private set; }
+        public static PlayerLoopUpdate playerLoopUtil { get; set; }
         static ConcurrentQueue<SignalAwaiter> signalQueue = new();
         static ConcurrentQueue<SignalAwaiter> signalEndOfFrameQueue = new();
         static ConcurrentQueue<SignalAwaiterReusableFrame> signalQueueReusableFrame = new();
-        public static Thread IsMainthread {get;private set;}
+        static ConcurrentQueue<SignalAwaiterReusableFrame> signalQueueFixedUpdate = new();
+        public static int MainthreadID { get; private set; }
+        double screenRate;
         public PlayerLoopUpdate()
         {
-            if(playerLoopUtil == null)
+            if (playerLoopUtil == null)
             {
-                Application.wantsToQuit -= OnQuit;
+                var refValue = Screen.currentResolution.refreshRateRatio.value;
+                screenRate = (1f / (float)refValue);
+
+                MainthreadID = Thread.CurrentThread.ManagedThreadId;
                 Application.wantsToQuit += OnQuit;
                 playerLoopUtil = this;
                 AssignPlayerLoop(true);
             }
         }
+        /*
+        #if UNITY_EDITOR
+        double lastTime = 0;
+        
+        public void EditModeRunner()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                return;
+            }
+
+            var time = EditorApplication.timeSinceStartup;
+            
+            if(time < (lastTime + screenRate))
+            {
+                return;
+            }
+
+            lastTime = time;
+            UpdateRun();
+        }
+        #endif
+*/
         void AssignPlayerLoop(bool addElseRemove)
         {
             playerLoop = PlayerLoop.GetDefaultPlayerLoop();
             var update = GetUpdate(playerLoop);
 
-            if(addElseRemove)
+            if (addElseRemove)
             {
                 var customUpdate = new PlayerLoopSystem()
                 {
@@ -57,23 +84,29 @@ namespace VAwait
                     type = typeof(AwaitEndOfFrame)
                 };
 
+                var customFixedUpdate = new PlayerLoopSystem()
+                {
+                    updateDelegate = FixedUpdateRun,
+                    type = typeof(AwaitFixedUpdate)
+                };
+
                 var copy = ReplaceUpdateRoot(ref playerLoop, ref customUpdate, true);
                 var end = ReplaceEndOfFrameRoot(ref copy, ref customEndOfFrameUpdate, true);
-                PlayerLoop.SetPlayerLoop(end);
+                var fixedupdate = ReplaceFixedUpdateRoot(ref end, ref customFixedUpdate, true);
+                PlayerLoop.SetPlayerLoop(fixedupdate);
             }
             else
             {
                 var dummy = new PlayerLoopSystem();
-                var dummyEnd = new PlayerLoopSystem();
                 var copy = ReplaceUpdateRoot(ref playerLoop, ref dummy, false);
-                var end = ReplaceEndOfFrameRoot(ref copy, ref dummyEnd, false);
-                PlayerLoop.SetPlayerLoop(end);
+                var end = ReplaceEndOfFrameRoot(ref copy, ref dummy, false);
+                var fixedupdate = ReplaceFixedUpdateRoot(ref end, ref dummy, false);
+                PlayerLoop.SetPlayerLoop(fixedupdate);
             }
         }
         bool OnQuit()
         {
             AssignPlayerLoop(false);
-            Debug.Log("WE QUIT HERE BOII");
             return true;
         }
         PlayerLoopSystem GetUpdate(PlayerLoopSystem loopSystem)
@@ -94,6 +127,9 @@ namespace VAwait
 
             return default;
         }
+        /// <summary>
+        /// Replaces the Update subsystem.
+        /// </summary>
         PlayerLoopSystem ReplaceUpdateRoot(ref PlayerLoopSystem root, ref PlayerLoopSystem custom, bool addCustomUpdateElseClear)
         {
             var lis = root.subSystemList.ToList();
@@ -122,8 +158,7 @@ namespace VAwait
 
                 if (addCustomUpdateElseClear)
                 {
-                    //1 is after script Update.
-                    tmp.Insert(1, custom);
+                    tmp.Insert(0, custom);
                 }
 
                 root.subSystemList[index.Value].subSystemList = tmp.ToArray();
@@ -131,6 +166,9 @@ namespace VAwait
 
             return root;
         }
+        /// <summary>
+        /// Replaces the PostLateUpdate subsystem.
+        /// </summary>
         PlayerLoopSystem ReplaceEndOfFrameRoot(ref PlayerLoopSystem root, ref PlayerLoopSystem custom, bool addCustomUpdateElseClear)
         {
             var lis = root.subSystemList.ToList();
@@ -168,7 +206,45 @@ namespace VAwait
 
             return root;
         }
-        
+        /// <summary>
+        /// Replaces FixedUpdate subsystem.
+        /// </summary>
+        PlayerLoopSystem ReplaceFixedUpdateRoot(ref PlayerLoopSystem root, ref PlayerLoopSystem custom, bool addCustomUpdateElseClear)
+        {
+            var lis = root.subSystemList.ToList();
+            int? index = null;
+
+            for (int i = 0; i < root.subSystemList.Length; i++)
+            {
+                if (lis[i].type == typeof(FixedUpdate))
+                {
+                    index = i;
+                    break;
+                }
+            }
+
+            if (index.HasValue)
+            {
+                var tmp = root.subSystemList[index.Value].subSystemList.ToList();
+
+                for (int i = tmp.Count; i-- > 0;)
+                {
+                    if (tmp[i].type == typeof(AwaitFixedUpdate))
+                    {
+                        tmp.Remove(tmp[i]);
+                    }
+                }
+
+                if (addCustomUpdateElseClear)
+                {
+                    tmp.Add(custom);
+                }
+
+                root.subSystemList[index.Value].subSystemList = tmp.ToArray();
+            }
+
+            return root;
+        }
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Init()
         {
@@ -177,125 +253,164 @@ namespace VAwait
                 PlayerLoopUpdate.playerLoopUtil = new PlayerLoopUpdate();
             }
         }
-        bool queueIsRunning = false;
-        bool queueEndFrameRunning = false;
-        Queue<SignalAwaiter> sigs = new(15);
-        Queue<SignalAwaiter> sigsEndOfFrame = new(15);
-        Queue<SignalAwaiterReusableFrame> sigsReusableFrame = new(15);
         void EndFrameUpdateRun()
         {
-            if(queueEndFrameRunning)
+
+            while (signalEndOfFrameQueue.TryDequeue(out var signal))
             {
-                return;
+                signal.TrySetResult(true);
+                Wait.ReturnAwaiterToPool(signal);
             }
 
-            queueEndFrameRunning = true;
+        }
+        void FixedUpdateRun()
+        {
+            int len = 0;
+            int index = 0;
 
-            while(signalEndOfFrameQueue.TryDequeue(out var signal))
+            len = signalQueueFixedUpdate.Count;
+
+            if (len > 0)
             {
-                if(signal.frameIn < Time.frameCount)
+                while (signalQueueFixedUpdate.TryDequeue(out var signal))
                 {
+                    if (signal.frameIn == Time.frameCount)
+                    {
+                        index++;
+                        signalQueueFixedUpdate.Enqueue(signal);
+
+                        if (index == len)
+                        {
+                            break;
+                        }
+
+                        continue;
+                    }
+
                     signal.TrySetResult(true);
-                    Wait.ReturnAwaiterToPool(signal);
-                }
-                else
-                {
-                    sigsEndOfFrame.Enqueue(signal);
-                }
-            }
+                    index++;
 
-            while(sigsEndOfFrame.Count > 0)
-            {
-                signalEndOfFrameQueue.Enqueue(sigsEndOfFrame.Dequeue());
-            }
+                    if (index == len)
+                    {
+                        break;
+                    }
+                }
 
-            queueEndFrameRunning = false;
+                index = 0;
+            }
         }
         void UpdateRun()
         {
-            if(queueIsRunning)
-            {
-                return;
-            }
+            int len = 0;
+            int index = 0;
 
-            queueIsRunning = true;
+            len = signalQueue.Count;
 
-            while(signalQueue.TryDequeue(out var signal))
+            if (len > 0)
             {
-                if(signal.frameIn < Time.frameCount)
+                while (signalQueue.TryDequeue(out var signal))
                 {
+                    if (signal.frameIn == Time.frameCount)
+                    {
+                        index++;
+                        signalQueue.Enqueue(signal);
+
+                        if (index == len)
+                        {
+                            break;
+                        }
+
+                        continue;
+                    }
+
                     signal.TrySetResult(true);
+                    index++;
                     Wait.ReturnAwaiterToPool(signal);
+
+                    if (index == len)
+                    {
+                        break;
+                    }
                 }
-                else
-                {
-                    sigs.Enqueue(signal);
-                }
+
+                index = 0;
             }
 
-            while(signalQueueReusableFrame.TryDequeue(out var signal))
+            len = signalQueueReusableFrame.Count;
+
+            if (len > 0)
             {
-                if(signal.frameIn < Time.frameCount)
+                while (signalQueueReusableFrame.TryDequeue(out var signal))
                 {
+                    if (signal.frameIn == Time.frameCount)
+                    {
+                        index++;
+                        signalQueueReusableFrame.Enqueue(signal);
+
+                        if (index == len)
+                        {
+                            break;
+                        }
+
+                        continue;
+                    }
+
                     signal.TrySetResult(true);
-                }
-                else
-                {
-                    sigsReusableFrame.Enqueue(signal);
-                }
-            }
-            
-            while(sigs.Count > 0)
-            {
-                signalQueue.Enqueue(sigs.Dequeue());
-            }
+                    index++;
 
-            while(sigsReusableFrame.Count > 0)
-            {
-                signalQueueReusableFrame.Enqueue(sigsReusableFrame.Dequeue());
-            }
+                    if (index == len)
+                    {
+                        break;
+                    }
+                }
 
-            queueIsRunning = false;
+                index = 0;
+            }
         }
+
+        /// <summary>
+        /// Queues the next frame.
+        /// </summary>
+        /// <param name="signal"></param>
         public void QueueNextFrame(SignalAwaiter signal)
         {
             signal.frameIn = Time.frameCount;
-
-            if(!queueIsRunning)
-            {
-                signalQueue.Enqueue(signal);
-            }
-            else
-            {
-                sigs.Enqueue(signal);
-            }
+            signalQueue.Enqueue(signal);
         }
+        /// <summary>
+        /// Queues the next fixed update.
+        /// </summary>
+        /// <param name="signal"></param>
+        public void QueueFixedUpdate(SignalAwaiterReusableFrame signal)
+        {
+            signal.frameIn = Time.frameCount;
+            signalQueueFixedUpdate.Enqueue(signal);
+
+        }
+        /// <summary>
+        /// Queues end of frame.
+        /// </summary>
+        /// <param name="signal"></param>
         public void QueueEndOfFrame(SignalAwaiter signal)
         {
-            signal.frameIn = Time.frameCount;
-
-            if(!queueEndFrameRunning)
-            {
-                signalEndOfFrameQueue.Enqueue(signal);
-            }
-            else
-            {
-                sigsEndOfFrame.Enqueue(signal);
-            }
+            signalEndOfFrameQueue.Enqueue(signal);
         }
+        /// <summary>
+        /// Queues reusable awaiter the next frame.
+        /// </summary>
+        /// <param name="signal"></param>
         public void QueueReusableNextFrame(SignalAwaiterReusableFrame signal)
         {
+            //We skip the frame init here, it's not needed.
             signal.frameIn = Time.frameCount;
-
-            if(!queueIsRunning)
-            {
-                signalQueueReusableFrame.Enqueue(signal);
-            }
-            else
-            {
-                sigsReusableFrame.Enqueue(signal);
-            }
+            signalQueueReusableFrame.Enqueue(signal);
         }
+        /// <summary>
+        /// Finds subsystem.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="def"></param>
+        /// <returns></returns>
         private static PlayerLoopSystem FindSubSystem<T>(PlayerLoopSystem def)
         {
             if (def.type == typeof(T))
