@@ -54,7 +54,6 @@ namespace VAwait
 
             if (_continuation != null)
                 throw new InvalidOperationException("VAwait Error : Is already being awaited");
-
             _continuation = continuation;
         }
 
@@ -194,7 +193,7 @@ namespace VAwait
         }
         public SignalAwaiterReusableFrame GetAwaiter()
         {            
-            if(frameIn != Time.frameCount)
+            if(frameIn != PlayerLoopUpdate.playerLoopUtil.GetCurrentFrame)
             {
                 Reset();
                 PlayerLoopUpdate.playerLoopUtil.QueueReusableNextFrame(this);

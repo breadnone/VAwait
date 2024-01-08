@@ -35,14 +35,12 @@ namespace VAwait.Editor
             {
                 EditorApplication.playModeStateChanged += LogPlayModeState;
 
-/*
                 if(PlayerLoopUpdate.playerLoopUtil == null)
                 {
                     PlayerLoopUpdate.playerLoopUtil = new PlayerLoopUpdate();
                 }
                 
                 EditorApplication.update += PlayerLoopUpdate.playerLoopUtil.EditModeRunner;
-                */
             }
 
             private static void LogPlayModeState(PlayModeStateChange state)

@@ -241,7 +241,6 @@ namespace VAwait
         {
             await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
             PlayerLoopUpdate.playerLoopUtil.QueueEndOfFrame(signal);
-            //runtimeInstance.component.TriggerEndFrame(signal);
         }
         /// <summary>
         /// Waits until Predicate<bool> is True. Can't be awaited multiple times.

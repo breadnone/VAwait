@@ -42,29 +42,51 @@ namespace VAwait
                 AssignPlayerLoop(true);
             }
         }
-        /*
-        #if UNITY_EDITOR
+        public int GetCurrentFrame
+        {
+            get
+            {
+                if (Wait.playMode == UPlayStateMode.PlayMode)
+                {
+                    return Time.frameCount;
+                }
+                else
+                {
+                    return dummyFrame;
+                }
+            }
+        }
+        int dummyFrame = 0;
+#if UNITY_EDITOR
+
         double lastTime = 0;
-        
+
         public void EditModeRunner()
         {
-            if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating || Wait.playMode == UPlayStateMode.PlayMode)
             {
                 return;
             }
 
             var time = EditorApplication.timeSinceStartup;
-            
-            if(time < (lastTime + screenRate))
+
+            if (time < (lastTime + screenRate))
             {
                 return;
             }
 
             lastTime = time;
+            dummyFrame++;
+
+            if (dummyFrame == int.MaxValue - 1)
+            {
+                dummyFrame = 1;
+            }
+
             UpdateRun();
         }
-        #endif
-*/
+#endif
+
         void AssignPlayerLoop(bool addElseRemove)
         {
             playerLoop = PlayerLoop.GetDefaultPlayerLoop();
@@ -274,7 +296,7 @@ namespace VAwait
             {
                 while (signalQueueFixedUpdate.TryDequeue(out var signal))
                 {
-                    if (signal.frameIn == Time.frameCount)
+                    if (signal.frameIn == GetCurrentFrame)
                     {
                         index++;
                         signalQueueFixedUpdate.Enqueue(signal);
@@ -310,7 +332,7 @@ namespace VAwait
             {
                 while (signalQueue.TryDequeue(out var signal))
                 {
-                    if (signal.frameIn == Time.frameCount)
+                    if (signal.frameIn == GetCurrentFrame)
                     {
                         index++;
                         signalQueue.Enqueue(signal);
@@ -342,7 +364,7 @@ namespace VAwait
             {
                 while (signalQueueReusableFrame.TryDequeue(out var signal))
                 {
-                    if (signal.frameIn == Time.frameCount)
+                    if (signal.frameIn == GetCurrentFrame)
                     {
                         index++;
                         signalQueueReusableFrame.Enqueue(signal);
@@ -374,7 +396,7 @@ namespace VAwait
         /// <param name="signal"></param>
         public void QueueNextFrame(SignalAwaiter signal)
         {
-            signal.frameIn = Time.frameCount;
+            signal.frameIn = GetCurrentFrame;
             signalQueue.Enqueue(signal);
         }
         /// <summary>
@@ -383,7 +405,7 @@ namespace VAwait
         /// <param name="signal"></param>
         public void QueueFixedUpdate(SignalAwaiterReusableFrame signal)
         {
-            signal.frameIn = Time.frameCount;
+            signal.frameIn = GetCurrentFrame;
             signalQueueFixedUpdate.Enqueue(signal);
 
         }
@@ -402,7 +424,7 @@ namespace VAwait
         public void QueueReusableNextFrame(SignalAwaiterReusableFrame signal)
         {
             //We skip the frame init here, it's not needed.
-            signal.frameIn = Time.frameCount;
+            signal.frameIn = GetCurrentFrame;
             signalQueueReusableFrame.Enqueue(signal);
         }
         /// <summary>
