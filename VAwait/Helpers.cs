@@ -193,7 +193,7 @@ namespace VAwait
         }
         public SignalAwaiterReusableFrame GetAwaiter()
         {            
-            if(frameIn != PlayerLoopUpdate.playerLoopUtil.GetCurrentFrame)
+            if(frameIn != PlayerLoopUpdate.playerLoopUtil.GetCurrentFrame())
             {
                 Reset();
                 PlayerLoopUpdate.playerLoopUtil.QueueReusableNextFrame(this);

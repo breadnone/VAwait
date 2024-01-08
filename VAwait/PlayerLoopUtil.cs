@@ -42,21 +42,8 @@ namespace VAwait
                 AssignPlayerLoop(true);
             }
         }
-        public int GetCurrentFrame
-        {
-            get
-            {
-                if (Wait.playMode == UPlayStateMode.PlayMode)
-                {
-                    return Time.frameCount;
-                }
-                else
-                {
-                    return dummyFrame;
-                }
-            }
-        }
-        int dummyFrame = 0;
+        public Func<int> GetCurrentFrame;
+        public int dummyFrame = 0;
 #if UNITY_EDITOR
 
         double lastTime = 0;
@@ -296,7 +283,7 @@ namespace VAwait
             {
                 while (signalQueueFixedUpdate.TryDequeue(out var signal))
                 {
-                    if (signal.frameIn == GetCurrentFrame)
+                    if (signal.frameIn == GetCurrentFrame())
                     {
                         index++;
                         signalQueueFixedUpdate.Enqueue(signal);
@@ -332,7 +319,7 @@ namespace VAwait
             {
                 while (signalQueue.TryDequeue(out var signal))
                 {
-                    if (signal.frameIn == GetCurrentFrame)
+                    if (signal.frameIn == GetCurrentFrame())
                     {
                         index++;
                         signalQueue.Enqueue(signal);
@@ -364,7 +351,7 @@ namespace VAwait
             {
                 while (signalQueueReusableFrame.TryDequeue(out var signal))
                 {
-                    if (signal.frameIn == GetCurrentFrame)
+                    if (signal.frameIn == GetCurrentFrame())
                     {
                         index++;
                         signalQueueReusableFrame.Enqueue(signal);
@@ -396,7 +383,7 @@ namespace VAwait
         /// <param name="signal"></param>
         public void QueueNextFrame(SignalAwaiter signal)
         {
-            signal.frameIn = GetCurrentFrame;
+            signal.frameIn = GetCurrentFrame();
             signalQueue.Enqueue(signal);
         }
         /// <summary>
@@ -405,7 +392,7 @@ namespace VAwait
         /// <param name="signal"></param>
         public void QueueFixedUpdate(SignalAwaiterReusableFrame signal)
         {
-            signal.frameIn = GetCurrentFrame;
+            signal.frameIn = GetCurrentFrame();
             signalQueueFixedUpdate.Enqueue(signal);
 
         }
@@ -424,7 +411,7 @@ namespace VAwait
         public void QueueReusableNextFrame(SignalAwaiterReusableFrame signal)
         {
             //We skip the frame init here, it's not needed.
-            signal.frameIn = GetCurrentFrame;
+            signal.frameIn = GetCurrentFrame();
             signalQueueReusableFrame.Enqueue(signal);
         }
         /// <summary>

@@ -15,8 +15,14 @@ namespace VAwait
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Start()
         {
+            PlayerLoopUpdate.playerLoopUtil.GetCurrentFrame = GetFrame;
             Wait.playMode = UPlayStateMode.PlayMode;
             Wait.StartAwait();
+        }
+
+        static int GetFrame()
+        {
+            return Time.frameCount;
         }
     }
 }
@@ -40,6 +46,7 @@ namespace VAwait.Editor
                     PlayerLoopUpdate.playerLoopUtil = new PlayerLoopUpdate();
                 }
                 
+                PlayerLoopUpdate.playerLoopUtil.GetCurrentFrame = GetFrame;
                 EditorApplication.update += PlayerLoopUpdate.playerLoopUtil.EditModeRunner;
             }
 
@@ -56,6 +63,13 @@ namespace VAwait.Editor
                     Wait.playMode = UPlayStateMode.None;
                 }
             }
+        }
+
+        static int GetFrame()
+        {
+
+            return PlayerLoopUpdate.playerLoopUtil.dummyFrame;
+                
         }
     }
 }
