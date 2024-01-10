@@ -80,5 +80,6 @@ async Task AsyncMethod()
 ```
 # Note :  
 - The SignalAwaiter instances can't be awaited multiple times. Use NextFrameReusable or SecondsReusable for when you need to await it more than once.
-- Runtime only. Edit mode feature is done mostly, but quite limited and lack of testing. So disabled for now.
+- Edit mode feature is done mostly, but quite limited and lack of testing.
 - Wait.Seconds will end at the end of current frame.
+- Using non default Time.timeScale will add extra allocation.
