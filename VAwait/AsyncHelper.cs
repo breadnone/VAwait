@@ -38,6 +38,7 @@ namespace VAwait
         static Dictionary<int, SignalAwaiter> setIdd = new();
         public static UPlayStateMode playMode { get; set; } = UPlayStateMode.None;
         public static int poolLength { get; set; } = 15;
+        static SynchronizationContext unityContext;
 
         public static void RemoveIDD(int id)
         {
@@ -52,6 +53,11 @@ namespace VAwait
         }
         static void PrepareAsyncHelper()
         {
+            if(unityContext == null)
+            {
+                unityContext = SynchronizationContext.Current;
+            }
+
             if (awaitTokenSource != null)
             {
                 awaitTokenSource.Cancel();
@@ -105,12 +111,12 @@ namespace VAwait
             }
         }
         /// <summary>
-        /// Pooled awaiter, awaits for next frame. Can't be awaited more than once.
+        /// Pooled awaiter, awaits for next frame. Can't be awaited more than once. This awaiter won't be affected by Time.timeScale, use Wait.Null or Wait.FixedUpdate instead.
         /// </summary>
         public static SignalAwaiter NextFrame()
         {
             var ins = GetPooled();
-            //runtimeInstance.component.TriggerFrameCoroutine(ins);
+
             try
             {
                 return ins;
@@ -121,7 +127,7 @@ namespace VAwait
             }
         }
         /// <summary>
-        /// Wait until end of frame. Can't be awaited more than once.
+        /// Wait until end of frame. Can't be awaited more than once. This awaiter will not be affected by Time.timeScale. 
         /// </summary>
         public static SignalAwaiter EndOfFrame()
         {
@@ -138,17 +144,17 @@ namespace VAwait
             }
         }
         /// <summary>
-        /// Reusable awaiter, can be awaited multiple times.
+        /// Reusable awaiter, can be awaited multiple times. This awaiter won't be affected by Time.timeScale, use Wait.Null or Wait.FixedUpdate instead.
         /// </summary>
         public static SignalAwaiterReusable NextFrameReusable()
         {
             return new SignalAwaiterReusable(awaitTokenSource);
         }
         /// <summary>
-        /// Equals to NextFrame but won't be affected by timeScale. Calls for Unity's yield return null(coroutine).
+        /// Equals to NextFrame but respects the Time.timeScale.
         /// </summary>
         /// <returns></returns>
-        public static SignalAwaiter NullAlloc()
+        public static SignalAwaiterReusable Null()
         {
             #if UNITY_EDITOR
             if(!EditorApplication.isPlaying)
@@ -157,7 +163,7 @@ namespace VAwait
             }
             #endif
 
-            var ins = GetPooled();
+            var ins = new SignalAwaiterReusable(awaitTokenSource);
 
             try
             {
@@ -165,7 +171,7 @@ namespace VAwait
             }
             finally
             {
-                runtimeInstance.component.TriggerFrameCoroutine(ins);
+                PlayerLoopUpdate.playerLoopUtil.QueueFixedUpdate(ins);
             }
         }
         /// <summary>
@@ -236,7 +242,24 @@ namespace VAwait
             }
             finally
             {
-                _ = WaitSeconds(duration, ins);
+                _ = WaitSeconds(duration, ins, false);
+            }
+        }
+        /// <summary>
+        /// Waits for n duration in seconds.
+        /// </summary>
+        /// <param name="duration"></param>
+        public static SignalAwaiter SecondsRealtime(float duration)
+        {
+            var ins = GetPooled();
+            
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                _ = WaitSeconds(duration, ins, true);
             }
         }
         /// <summary>
@@ -260,7 +283,31 @@ namespace VAwait
             }
             finally
             {
-                _ = WaitSeconds(duration, ins);
+                _ = WaitSeconds(duration, ins, false);
+            }
+        }
+        /// <summary>
+        /// Waits for n duration in unscaledTime in seconds.
+        /// </summary>
+        /// <param name="duration"></param>
+        public static SignalAwaiter SecondsRealtime(float duration, int setId)
+        {
+            if (setId < 0)
+            {
+                throw new Exception("VAwait Error : Id can't be negative number");
+            }
+
+            var ins = GetPooled();
+            ins.GetSetId = setId;
+            setIdd.TryAdd(setId, ins);
+            
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                _ = WaitSeconds(duration, ins, true);
             }
         }
         /// <summary>
@@ -307,10 +354,113 @@ namespace VAwait
         /// <summary>
         /// Internal use for wait for Seconds.
         /// </summary>
-        static async ValueTask WaitSeconds(float duration, SignalAwaiter signal)
+
+        static async ValueTask WaitSeconds(float duration, SignalAwaiter signal, bool realtime)
         {
-            await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
+            if(!realtime)
+            {
+                var timeScale = Timing(out var val);
+                var frame = NextFrame();
+                /*
+                float scale = val;
+                var frame = NextFrameReusable();
+                */
+
+                if(timeScale)
+                {
+                    if(Mathf.Approximately(1f, Time.timeScale))
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
+                    }
+                    else
+                    {
+                        var calcTime = duration + (duration * (1 - val));
+
+                        if(Mathf.Approximately(0, val))
+                        {
+                            var reuse = NextFrameReusable();
+
+                            await Task.Run(async ()=> 
+                            {
+                                while(Mathf.Approximately(0, Time.timeScale))
+                                {
+                                    await reuse;
+
+                                    if(awaitTokenSource.IsCancellationRequested)
+                                    {
+                                        return;
+                                    }
+                                }
+                            });
+                        }
+                        else
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(calcTime), GetToken);
+
+                            if(awaitTokenSource.IsCancellationRequested)
+                            {
+                                return;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
+                }
+
+                /*   
+                while(Timing(out var value))
+                {
+                    await frame;
+
+                    if(val < 1 - (Time.unscaledDeltaTime * 2))
+                    {
+                        val += (val * value) * Time.unscaledDeltaTime;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                */
+            }
+            else
+            {
+                await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
+            }
+
             PlayerLoopUpdate.playerLoopUtil.QueueEndOfFrame(signal);
+        }
+        static bool Timing(out float value)
+        {
+                var time = Time.timeScale;
+
+                if(Mathf.Approximately(time, 1f))
+                {
+                    value = 1f;
+                    return false;
+                }
+                else
+                {
+                    value = time;
+                    return true;
+                }
+            
+        }
+        public static double NormalizeTime(double value, double min, double max)
+        {
+            if (max == min)
+            {
+                // Handle edge case where all values are identical
+                return 0.5;
+            }
+
+            // Apply normalization formula
+            double normalizedValue = (value - min) / (max - min);
+
+            // Ensure normalized value stays within 0 to 1 range
+            return Math.Max(0, Math.Min(1, normalizedValue));
         }
         /// <summary>
         /// Waits until Predicate<bool> is True. Can't be awaited multiple times.
@@ -480,6 +630,38 @@ namespace VAwait
         {
             await wait;
             return wait;
+        }
+        /// <summary>
+        /// Invokes on threadPool.
+        /// </summary>
+        /// <param name="func"></param>
+        public static void InvokeOnThreadpool(Action func)
+        {
+            Task.Run(func);
+        }
+        /// <summary>
+        /// Invokes on threadPool and await for completion. 
+        /// </summary>
+        /// <param name="func"></param>
+        /// <returns></returns>
+        public static SignalAwaiter AwaitOnThreadpool(Func<Task> func)
+        {
+            var ins = GetPooled();
+            
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                Task.Run(async ()=>
+                {
+                    await func.Invoke();
+                    await EndOfFrame();
+                    ins.TrySetResult(true);
+                    ReturnAwaiterToPool(ins);
+                });
+            }
         }
     }
 

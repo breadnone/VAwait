@@ -2,9 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Collections;
 using System.Threading;
-using UnityEngine;
-using System.Threading.Tasks.Sources;
-using System.Threading.Tasks;
+
 
 namespace VAwait
 {
@@ -74,7 +72,12 @@ namespace VAwait
                 this.IsCompleted = true;
                 this._result = result;
 
-                _continuation?.Invoke();
+                if(_continuation !=null)
+                {
+                    _continuation?.Invoke();
+                    _continuation = null;
+                }
+                
                 return true;
             }
 

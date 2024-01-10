@@ -29,6 +29,7 @@ namespace VAwait
         static ConcurrentQueue<SignalAwaiter> signalEndOfFrameQueue = new();
         static ConcurrentQueue<SignalAwaiterReusable> signalQueueReusableFrame = new();
         static ConcurrentQueue<SignalAwaiterReusable> signalQueueFixedUpdate = new();
+        static ConcurrentQueue<SignalAwaiter> signalQueueFixedUpdateRealtime = new();
         public static int MainthreadID { get; private set; }
         double screenRate;
         public PlayerLoopUpdate()
@@ -281,6 +282,38 @@ namespace VAwait
             int len = 0;
             int index = 0;
 
+            len = signalQueueFixedUpdateRealtime.Count;
+
+            if (len > 0)
+            {
+                while (signalQueueFixedUpdateRealtime.TryDequeue(out var signal))
+                {
+                    if (signal.frameIn == GetCurrentFrame())
+                    {
+                        index++;
+                        signalQueueFixedUpdateRealtime.Enqueue(signal);
+
+                        if (index == len)
+                        {
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    signal.TrySetResult(true);
+                    index++;
+                    Wait.ReturnAwaiterToPool(signal);
+
+                    if (index == len)
+                    {
+                        break;
+                    }
+                }
+
+                index = 0;
+            }
+
             len = signalQueueFixedUpdate.Count;
 
             if (len > 0)
@@ -389,6 +422,15 @@ namespace VAwait
         {
             signal.frameIn = GetCurrentFrame();
             signalQueue.Enqueue(signal);
+        }
+        /// <summary>
+        /// Queue the next fixedUpdate frame.
+        /// </summary>
+        /// <param name="signal"></param>
+        public void QueueFixedNextFrame(SignalAwaiter signal)
+        {
+            signal.frameIn = GetCurrentFrame();
+            signalQueueFixedUpdateRealtime.Enqueue(signal);
         }
         /// <summary>
         /// Queues the next fixed update.
