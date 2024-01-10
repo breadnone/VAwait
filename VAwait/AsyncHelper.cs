@@ -53,7 +53,7 @@ namespace VAwait
         }
         static void PrepareAsyncHelper()
         {
-            if(unityContext == null)
+            if (unityContext == null)
             {
                 unityContext = SynchronizationContext.Current;
             }
@@ -156,12 +156,12 @@ namespace VAwait
         /// <returns></returns>
         public static SignalAwaiterReusable Null()
         {
-            #if UNITY_EDITOR
-            if(!EditorApplication.isPlaying)
+#if UNITY_EDITOR
+            if (!EditorApplication.isPlaying)
             {
                 throw new Exception("VAwait Error : NullAlloc can't be used for edit mode.");
             }
-            #endif
+#endif
 
             var ins = new SignalAwaiterReusable(awaitTokenSource);
 
@@ -181,12 +181,12 @@ namespace VAwait
         /// <returns></returns>
         public static SignalAwaiter SecondsScaled(float time)
         {
-            #if UNITY_EDITOR
-            if(!EditorApplication.isPlaying)
+#if UNITY_EDITOR
+            if (!EditorApplication.isPlaying)
             {
                 throw new Exception("VAwait Error : SecondsScaled can't be used for edit mode.");
             }
-            #endif
+#endif
 
             var ins = GetPooled();
 
@@ -205,7 +205,7 @@ namespace VAwait
         public static SignalAwaiterReusable FixedUpdate()
         {
             var ins = new SignalAwaiterReusable(awaitTokenSource);
-            
+
             try
             {
                 return ins;
@@ -235,7 +235,7 @@ namespace VAwait
         public static SignalAwaiter Seconds(float duration)
         {
             var ins = GetPooled();
-            
+
             try
             {
                 return ins;
@@ -252,7 +252,7 @@ namespace VAwait
         public static SignalAwaiter SecondsRealtime(float duration)
         {
             var ins = GetPooled();
-            
+
             try
             {
                 return ins;
@@ -276,7 +276,7 @@ namespace VAwait
             var ins = GetPooled();
             ins.GetSetId = setId;
             setIdd.TryAdd(setId, ins);
-            
+
             try
             {
                 return ins;
@@ -300,7 +300,7 @@ namespace VAwait
             var ins = GetPooled();
             ins.GetSetId = setId;
             setIdd.TryAdd(setId, ins);
-            
+
             try
             {
                 return ins;
@@ -316,16 +316,16 @@ namespace VAwait
         /// <param name="coroutine"></param>
         public static SignalAwaiter Coroutine(IEnumerator coroutine)
         {
-            #if UNITY_EDITOR
-            if(!EditorApplication.isPlaying)
+#if UNITY_EDITOR
+            if (!EditorApplication.isPlaying)
             {
                 throw new Exception("VAwait Error : Coroutine can't be used for edit mode.");
             }
-            #endif
+#endif
 
             var ins = GetPooled();
             ins.AssignEnumerator(coroutine);
-            
+
             try
             {
                 return ins;
@@ -357,47 +357,66 @@ namespace VAwait
 
         static async ValueTask WaitSeconds(float duration, SignalAwaiter signal, bool realtime)
         {
-            if(!realtime)
+            if (!realtime)
             {
                 var timeScale = Timing(out var val);
                 var frame = NextFrame();
-                /*
-                float scale = val;
-                var frame = NextFrameReusable();
-                */
 
-                if(timeScale)
+                if (timeScale)
                 {
-                    if(Mathf.Approximately(1f, Time.timeScale))
+                    if (Mathf.Approximately(1, val))
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
+                        await Task.Delay(TimeSpan.FromSeconds(duration - 0.051f), GetToken);
                     }
                     else
                     {
                         var calcTime = duration + (duration * (1 - val));
 
-                        if(Mathf.Approximately(0, val))
+                        if (Mathf.Approximately(0, val) || val < 0)
                         {
                             var reuse = NextFrameReusable();
 
-                            await Task.Run(async ()=> 
+                            await Task.Run(async () =>
                             {
-                                while(Mathf.Approximately(0, Time.timeScale))
+                                while (Mathf.Approximately(0, Time.timeScale))
                                 {
                                     await reuse;
 
-                                    if(awaitTokenSource.IsCancellationRequested)
+                                    if (awaitTokenSource.IsCancellationRequested)
                                     {
                                         return;
                                     }
                                 }
                             });
                         }
+                        else if(val > 1)
+                        {
+                            var calc = duration - (duration * (val - 1f));
+                            bool invalid = false;
+
+                            if(calc == 0 || calc < 0)
+                            {
+                                invalid = true;
+                            }
+
+                            if(!invalid)
+                            {
+                                await Task.Delay(TimeSpan.FromSeconds(calc), GetToken);
+
+                                if (awaitTokenSource.IsCancellationRequested)
+                                {
+                                    return;
+                                }
+                            }
+
+                            PlayerLoopUpdate.playerLoopUtil.QueueFixedUpdate(new SignalAwaiterReusable(awaitTokenSource));
+                            return;
+                        }
                         else
                         {
                             await Task.Delay(TimeSpan.FromSeconds(calcTime), GetToken);
 
-                            if(awaitTokenSource.IsCancellationRequested)
+                            if (awaitTokenSource.IsCancellationRequested)
                             {
                                 return;
                             }
@@ -406,47 +425,31 @@ namespace VAwait
                 }
                 else
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
+                    await Task.Delay(TimeSpan.FromSeconds(duration - 0.051f), GetToken);
                 }
-
-                /*   
-                while(Timing(out var value))
-                {
-                    await frame;
-
-                    if(val < 1 - (Time.unscaledDeltaTime * 2))
-                    {
-                        val += (val * value) * Time.unscaledDeltaTime;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                */
             }
             else
             {
-                await Task.Delay(TimeSpan.FromSeconds(duration), GetToken);
+                await Task.Delay(TimeSpan.FromSeconds(duration - 0.051f), GetToken);
             }
 
             PlayerLoopUpdate.playerLoopUtil.QueueEndOfFrame(signal);
         }
         static bool Timing(out float value)
         {
-                var time = Time.timeScale;
+            var time = Time.timeScale;
 
-                if(Mathf.Approximately(time, 1f))
-                {
-                    value = 1f;
-                    return false;
-                }
-                else
-                {
-                    value = time;
-                    return true;
-                }
-            
+            if (Mathf.Approximately(time, 1f))
+            {
+                value = time;
+                return false;
+            }
+            else
+            {
+                value = time;
+                return true;
+            }
+
         }
         public static double NormalizeTime(double value, double min, double max)
         {
@@ -467,15 +470,15 @@ namespace VAwait
         /// </summary>
         /// <param name="predicate">Condition.</param>
         /// <param name="tokenSource">The token source.</param>
-        static async Task<bool> WaitUntil(Predicate<bool> predicate , CancellationTokenSource tokenSource)
+        static async Task<bool> WaitUntil(Predicate<bool> predicate, CancellationTokenSource tokenSource)
         {
             var frame = NextFrameReusable();
 
-            while(predicate.Invoke(false))
+            while (predicate.Invoke(false))
             {
                 await frame;
-                
-                if(tokenSource.IsCancellationRequested)
+
+                if (tokenSource.IsCancellationRequested)
                 {
                     return false;
                 }
@@ -488,7 +491,7 @@ namespace VAwait
         /// </summary>
         static async ValueTask PeriodicTimer(float interval, int maxTickCount, Action<int> tick, CancellationTokenSource tokenSource)
         {
-            if(maxTickCount < 1)
+            if (maxTickCount < 1)
             {
                 throw new Exception("VAwait Error : maxTickCount can't be less than 1.");
             }
@@ -496,11 +499,11 @@ namespace VAwait
             int count = 0;
             var frame = NextFrameReusable();
 
-            while(maxTickCount != count)
+            while (maxTickCount != count)
             {
                 await Task.Delay(TimeSpan.FromSeconds(interval), tokenSource.Token);
-                
-                if(tokenSource.IsCancellationRequested)
+
+                if (tokenSource.IsCancellationRequested)
                 {
                     var ins = GetPooled();
 
@@ -510,11 +513,11 @@ namespace VAwait
 
                 await frame;
 
-                if(awaitTokenSource.IsCancellationRequested)
+                if (awaitTokenSource.IsCancellationRequested)
                 {
                     return;
                 }
-                
+
                 count++;
                 tick.Invoke(count);
             }
@@ -570,7 +573,7 @@ namespace VAwait
             chain.cts = cts;
             await func();
 
-            if(cts.IsCancellationRequested)
+            if (cts.IsCancellationRequested)
             {
                 chain.completed = false;
                 return chain;
@@ -585,7 +588,7 @@ namespace VAwait
             chain.cts = cts;
             await func;
 
-            if(cts.IsCancellationRequested)
+            if (cts.IsCancellationRequested)
             {
                 chain.completed = false;
                 return chain;
@@ -597,8 +600,8 @@ namespace VAwait
         public static async Task<AwaitChain> Next(this Task<AwaitChain> signal, Func<Task> func)
         {
             await func();
-            
-            if(signal.Result.cts.IsCancellationRequested)
+
+            if (signal.Result.cts.IsCancellationRequested)
             {
                 signal.Result.completed = false;
             }
@@ -610,7 +613,7 @@ namespace VAwait
         {
             await func();
 
-            if(signal.Result.cts.IsCancellationRequested)
+            if (signal.Result.cts.IsCancellationRequested)
             {
                 signal.Result.completed = false;
             }
@@ -647,14 +650,14 @@ namespace VAwait
         public static SignalAwaiter AwaitOnThreadpool(Func<Task> func)
         {
             var ins = GetPooled();
-            
+
             try
             {
                 return ins;
             }
             finally
             {
-                Task.Run(async ()=>
+                Task.Run(async () =>
                 {
                     await func.Invoke();
                     await EndOfFrame();
