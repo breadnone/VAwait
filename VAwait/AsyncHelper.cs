@@ -17,7 +17,6 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -25,6 +24,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System;
 using System.Collections.Concurrent;
+using UnityEditor;
+using System.Runtime.CompilerServices;
 
 //Async await helper.
 namespace VAwait
@@ -104,7 +105,7 @@ namespace VAwait
             }
         }
         /// <summary>
-        /// Wait for next frame. Can't be awaited more than once.
+        /// Pooled awaiter, awaits for next frame. Can't be awaited more than once.
         /// </summary>
         public static SignalAwaiter NextFrame()
         {
@@ -139,17 +140,65 @@ namespace VAwait
         /// <summary>
         /// Reusable awaiter, can be awaited multiple times.
         /// </summary>
-        public static SignalAwaiterReusableFrame NextFrameReusable()
+        public static SignalAwaiterReusable NextFrameReusable()
         {
-            return new SignalAwaiterReusableFrame(awaitTokenSource);
+            return new SignalAwaiterReusable(awaitTokenSource);
         }
+        /// <summary>
+        /// Equals to NextFrame but won't be affected by timeScale. Calls for Unity's yield return null(coroutine).
+        /// </summary>
+        /// <returns></returns>
+        public static SignalAwaiter NullAlloc()
+        {
+            #if UNITY_EDITOR
+            if(!EditorApplication.isPlaying)
+            {
+                throw new Exception("VAwait Error : NullAlloc can't be used for edit mode.");
+            }
+            #endif
 
+            var ins = GetPooled();
+
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                runtimeInstance.component.TriggerFrameCoroutine(ins);
+            }
+        }
+        /// <summary>
+        /// This calls Unity's coroutine.
+        /// </summary>
+        /// <param name="time"></param>
+        /// <returns></returns>
+        public static SignalAwaiter SecondsScaled(float time)
+        {
+            #if UNITY_EDITOR
+            if(!EditorApplication.isPlaying)
+            {
+                throw new Exception("VAwait Error : SecondsScaled can't be used for edit mode.");
+            }
+            #endif
+
+            var ins = GetPooled();
+
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                runtimeInstance.component.TriggerSecondsCoroutine(ins, time);
+            }
+        }
         /// <summary>
         /// Awaits for the next FixedUpdate.
         /// </summary>
-        public static SignalAwaiterReusableFrame FixedUpdate()
+        public static SignalAwaiterReusable FixedUpdate()
         {
-            var ins = new SignalAwaiterReusableFrame(awaitTokenSource);
+            var ins = new SignalAwaiterReusable(awaitTokenSource);
             
             try
             {
@@ -203,10 +252,16 @@ namespace VAwait
 
             var ins = GetPooled();
             ins.GetSetId = setId;
-
             setIdd.TryAdd(setId, ins);
-            _ = WaitSeconds(duration, ins);
-            return ins;
+            
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                _ = WaitSeconds(duration, ins);
+            }
         }
         /// <summary>
         /// Waits for coroutine.
@@ -214,14 +269,29 @@ namespace VAwait
         /// <param name="coroutine"></param>
         public static SignalAwaiter Coroutine(IEnumerator coroutine)
         {
+            #if UNITY_EDITOR
+            if(!EditorApplication.isPlaying)
+            {
+                throw new Exception("VAwait Error : Coroutine can't be used for edit mode.");
+            }
+            #endif
+
             var ins = GetPooled();
             ins.AssignEnumerator(coroutine);
-            runtimeInstance.component.TriggerCoroutine(coroutine, ins);
-            return ins;
+            
+            try
+            {
+                return ins;
+            }
+            finally
+            {
+                runtimeInstance.component.TriggerCoroutine(coroutine, ins);
+            }
         }
         /// <summary>
         /// Init.
         /// </summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static void StartAwait()
         {
             PrepareAsyncHelper();
@@ -343,6 +413,73 @@ namespace VAwait
             {
                 return awaitTokenSource.Token;
             }
+        }
+        public static async Task<AwaitChain> TaskChain(Func<Task> func, CancellationTokenSource cts)
+        {
+            var chain = new AwaitChain();
+            chain.cts = cts;
+            await func();
+
+            if(cts.IsCancellationRequested)
+            {
+                chain.completed = false;
+                return chain;
+            }
+
+            chain.completed = true;
+            return chain;
+        }
+        public static async Task<AwaitChain> TaskChain(SignalAwaiter func, CancellationTokenSource cts)
+        {
+            var chain = new AwaitChain();
+            chain.cts = cts;
+            await func;
+
+            if(cts.IsCancellationRequested)
+            {
+                chain.completed = false;
+                return chain;
+            }
+
+            chain.completed = true;
+            return chain;
+        }
+        public static async Task<AwaitChain> Next(this Task<AwaitChain> signal, Func<Task> func)
+        {
+            await func();
+            
+            if(signal.Result.cts.IsCancellationRequested)
+            {
+                signal.Result.completed = false;
+            }
+
+            signal.Result.completed = true;
+            return signal.Result;
+        }
+        public static async Task<AwaitChain> Next(this Task<AwaitChain> signal, Func<SignalAwaiter> func)
+        {
+            await func();
+
+            if(signal.Result.cts.IsCancellationRequested)
+            {
+                signal.Result.completed = false;
+            }
+
+            signal.Result.completed = true;
+            return signal.Result;
+        }
+        static async ValueTask Test()
+        {
+            await TaskChain(GG, new CancellationTokenSource()).Next(GG).Next(GG).Next(NextFrame);
+        }
+        static async Task GG()
+        {
+            await Task.Yield();
+        }
+        public static async Task<T> Await<T>(this T signal, T wait) where T : Task<T>
+        {
+            await wait;
+            return wait;
         }
     }
 

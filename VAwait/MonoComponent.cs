@@ -12,7 +12,6 @@ namespace VAwait
         static VWaitComponent mono { get; set; }
         WaitForFixedUpdate waitFixed;
         WaitForEndOfFrame endOfFrame;
-        WaitForSecondsRealtime realtime;
         void Awake()
         {
             waitFixed = new WaitForFixedUpdate();
@@ -31,6 +30,12 @@ namespace VAwait
                 GameObject.Destroy(this);
             }
         }
+        IEnumerator InstanceSeconds(SignalAwaiter signal, WaitForSeconds wait)
+        {
+            yield return wait;
+            signal.TrySetResult(true);
+            Wait.ReturnAwaiterToPool(signal);
+        }
         IEnumerator InstanceEndFrame(SignalAwaiter signal)
         {
             yield return endOfFrame;
@@ -43,7 +48,7 @@ namespace VAwait
             signal.TrySetResult(true);
             Wait.ReturnAwaiterToPool(signal);
         }
-        IEnumerator InstanceCoroutineFrameReusable(SignalAwaiterReusableFrame signal)
+        IEnumerator InstanceCoroutineFrameReusable(SignalAwaiterReusable signal)
         {
             yield return null;
             signal.TrySetResult(true);
@@ -68,11 +73,15 @@ namespace VAwait
         {
             StartCoroutine(InstanceCoroutineFrame(signal));
         }
+        public void TriggerSecondsCoroutine(SignalAwaiter signal, float duration)
+        {
+            StartCoroutine(InstanceSeconds(signal, new WaitForSeconds(duration)));
+        }
         public void TriggerEndFrame(SignalAwaiter signal)
         {
             StartCoroutine(InstanceEndFrame(signal));
         }
-        public void TriggerFrameCoroutineReusable(SignalAwaiterReusableFrame signal)
+        public void TriggerFrameCoroutineReusable(SignalAwaiterReusable signal)
         {
             StartCoroutine(InstanceCoroutineFrameReusable(signal));
         }

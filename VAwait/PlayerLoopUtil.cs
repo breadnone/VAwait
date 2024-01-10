@@ -9,11 +9,13 @@ using System.Text;
 using System.Linq;
 using System.Threading;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
+
 namespace VAwait
 {
     public sealed class AwaitUpdate { }
@@ -25,8 +27,8 @@ namespace VAwait
         public static PlayerLoopUpdate playerLoopUtil { get; set; }
         static ConcurrentQueue<SignalAwaiter> signalQueue = new();
         static ConcurrentQueue<SignalAwaiter> signalEndOfFrameQueue = new();
-        static ConcurrentQueue<SignalAwaiterReusableFrame> signalQueueReusableFrame = new();
-        static ConcurrentQueue<SignalAwaiterReusableFrame> signalQueueFixedUpdate = new();
+        static ConcurrentQueue<SignalAwaiterReusable> signalQueueReusableFrame = new();
+        static ConcurrentQueue<SignalAwaiterReusable> signalQueueFixedUpdate = new();
         public static int MainthreadID { get; private set; }
         double screenRate;
         public PlayerLoopUpdate()
@@ -44,6 +46,7 @@ namespace VAwait
         }
         public Func<int> GetCurrentFrame;
         public int dummyFrame = 0;
+
 #if UNITY_EDITOR
 
         double lastTime = 0;
@@ -185,7 +188,7 @@ namespace VAwait
 
             for (int i = 0; i < root.subSystemList.Length; i++)
             {
-                if (lis[i].type == typeof(PostLateUpdate))
+                if (lis[i].type == typeof(PreLateUpdate))
                 {
                     index = i;
                     break;
@@ -207,7 +210,8 @@ namespace VAwait
                 if (addCustomUpdateElseClear)
                 {
                     //1 is after script Update.
-                    tmp.Add(custom);
+                    int idx = tmp.FindIndex(x=> x.type == typeof(PreLateUpdate.ScriptRunBehaviourLateUpdate));
+                    tmp.Insert(idx + 1, custom);
                 }
 
                 root.subSystemList[index.Value].subSystemList = tmp.ToArray();
@@ -246,7 +250,8 @@ namespace VAwait
 
                 if (addCustomUpdateElseClear)
                 {
-                    tmp.Add(custom);
+                    var idx = tmp.FindIndex(x=> x.type == typeof(FixedUpdate.ScriptRunBehaviourFixedUpdate));
+                    tmp.Insert(idx - 1, custom);
                 }
 
                 root.subSystemList[index.Value].subSystemList = tmp.ToArray();
@@ -264,7 +269,6 @@ namespace VAwait
         }
         void EndFrameUpdateRun()
         {
-
             while (signalEndOfFrameQueue.TryDequeue(out var signal))
             {
                 signal.TrySetResult(true);
@@ -390,7 +394,7 @@ namespace VAwait
         /// Queues the next fixed update.
         /// </summary>
         /// <param name="signal"></param>
-        public void QueueFixedUpdate(SignalAwaiterReusableFrame signal)
+        public void QueueFixedUpdate(SignalAwaiterReusable signal)
         {
             signal.frameIn = GetCurrentFrame();
             signalQueueFixedUpdate.Enqueue(signal);
@@ -408,7 +412,7 @@ namespace VAwait
         /// Queues reusable awaiter the next frame.
         /// </summary>
         /// <param name="signal"></param>
-        public void QueueReusableNextFrame(SignalAwaiterReusableFrame signal)
+        public void QueueReusableNextFrame(SignalAwaiterReusable signal)
         {
             //We skip the frame init here, it's not needed.
             signal.frameIn = GetCurrentFrame();
@@ -438,6 +442,24 @@ namespace VAwait
                 }
             }
             return default(PlayerLoopSystem);
+        }
+        //TODO: I don't think respecting engine's timeScale is an option here.
+        // People using Time.timeScale to pause or to slowdown their games are just wrong to begin with.
+        public async ValueTask DeltaTimer(bool realtime)
+        {
+            if(!realtime)
+            {
+                if(!Mathf.Approximately(Time.timeScale, 1f))
+                {
+                    var dif = Time.timeScale;
+
+                    while(dif < 1)
+                    {
+                        dif += Time.unscaledDeltaTime;
+                        await Wait.EndOfFrame();
+                    }
+                }
+            }
         }
     }
 }

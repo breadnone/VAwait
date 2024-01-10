@@ -3,6 +3,8 @@ using System.Runtime.CompilerServices;
 using System.Collections;
 using System.Threading;
 using UnityEngine;
+using System.Threading.Tasks.Sources;
+using System.Threading.Tasks;
 
 namespace VAwait
 {
@@ -23,7 +25,7 @@ namespace VAwait
         public bool cancelled { get; private set; }
         public IEnumerator enumerator { get; private set; }
         public int GetSetId { get; set; } = -1;
-        public int frameIn {get;set;}
+        public int frameIn { get; set; }
         public bool IsCompleted
         {
             get;
@@ -44,7 +46,7 @@ namespace VAwait
         {
             return _result;
         }
- 
+
         public void OnCompleted(Action continuation)
         {
             if (token.IsCancellationRequested)
@@ -98,7 +100,7 @@ namespace VAwait
         }
 
         public SignalAwaiter GetAwaiter()
-        {           
+        {
             return this;
         }
 
@@ -125,19 +127,19 @@ namespace VAwait
         }
     }
 
-    public class SignalAwaiterReusableFrame : ICriticalNotifyCompletion
+    public class SignalAwaiterReusable : ICriticalNotifyCompletion
     {
         private Action _continuation;
         private bool _result;
         readonly CancellationToken token;
-        public int frameIn {get;set;}
+        public int frameIn { get; set; }
         public bool IsCompleted
         {
             get;
             private set;
         }
 
-        public SignalAwaiterReusableFrame(CancellationTokenSource cts)
+        public SignalAwaiterReusable(CancellationTokenSource cts)
         {
             token = cts.Token;
         }
@@ -170,7 +172,7 @@ namespace VAwait
                 this.IsCompleted = true;
                 this._result = result;
                 _continuation?.Invoke();
-                
+
                 return true;
             }
 
@@ -191,15 +193,27 @@ namespace VAwait
             this._continuation = null;
             this.IsCompleted = false;
         }
-        public SignalAwaiterReusableFrame GetAwaiter()
-        {            
-            if(frameIn != PlayerLoopUpdate.playerLoopUtil.GetCurrentFrame())
+        public SignalAwaiterReusable GetAwaiter()
+        {
+            bool pass = false;
+
+            if (frameIn != PlayerLoopUpdate.playerLoopUtil.GetCurrentFrame())
             {
                 Reset();
-                PlayerLoopUpdate.playerLoopUtil.QueueReusableNextFrame(this);
+                pass = true;
             }
 
-            return this;
+            try
+            {
+                return this;
+            }
+            finally
+            {
+                if (pass)
+                {
+                    PlayerLoopUpdate.playerLoopUtil.QueueReusableNextFrame(this);
+                }
+            }
         }
 
         public void UnsafeOnCompleted(Action continuation)
@@ -210,5 +224,30 @@ namespace VAwait
         {
             Reset();
         }
+    }
+    public class AwaitChain
+    {
+        public CancellationTokenSource cts { get; set; }
+        public bool completed {get;set;}
+        
+        /*
+        public async Task Test()
+        {
+            var cts = new CancellationTokenSource();
+            
+            //Chaining
+            await Wait.TaskChain(Wait.Seconds(5f), cts).Next(AsyncFoo).Next(Wait.NextFrame).Next(AsyncBar);
+        }
+        async Task AsyncFoo()
+        {
+            await Wait.Seconds(5f);
+            Debug.Log("Success!");
+        }
+        async Task AsyncBar()
+        {
+            await Wait.Seconds(5f);
+            Debug.Log("Success!");
+        }
+        */
     }
 }

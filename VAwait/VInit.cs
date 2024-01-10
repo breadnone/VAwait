@@ -55,12 +55,16 @@ namespace VAwait.Editor
                 if (state == PlayModeStateChange.EnteredPlayMode)
                 {
                     //EditorDeltaTM.StartStopEditorTime(false);
+                    EditorApplication.update -= PlayerLoopUpdate.playerLoopUtil.EditModeRunner;
+                    EditorApplication.update += PlayerLoopUpdate.playerLoopUtil.EditModeRunner;
                 }
                 else if (state == PlayModeStateChange.ExitingPlayMode)
                 {
                     Wait.DestroyAwaits();
                     //EditorDeltaTM.StartStopEditorTime(true);
                     Wait.playMode = UPlayStateMode.None;
+                    PlayerLoopUpdate.playerLoopUtil.GetCurrentFrame = GetFrame;
+                    EditorApplication.update -= PlayerLoopUpdate.playerLoopUtil.EditModeRunner;
                 }
             }
         }
