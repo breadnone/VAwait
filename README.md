@@ -59,6 +59,24 @@ async Task AsyncMethod()
      Debug.Log(tick);
    }, myTokenSource);
 }
+
+//Task method chaining
+
+        public async Task Test()
+        {
+            var cts = new CancellationTokenSource();
+            await Wait.TaskChain(Wait.Seconds(5f), cts).Next(AsyncFoo).Next(Wait.NextFrame).Next(AsyncBar);
+        }
+        async Task AsyncFoo()
+        {
+            await Wait.Seconds(5f);
+            Debug.Log("Success!");
+        }
+        async Task AsyncBar()
+        {
+            await Wait.Seconds(5f);
+            Debug.Log("Success!");
+        }
 ```
 # Note :  
 - The SignalAwaiter instances can't be awaited multiple times. Use NextFrameReusable or SecondsReusable for when you need to await it more than once.
