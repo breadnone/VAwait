@@ -1,5 +1,5 @@
 # VAwait
- Compact and simple pooled async/await library for Unity3D.  
+ Compact and simple pooled custom awaiter for Unity3D.  
 # Installation  
 - Download the source(.zip) and extract it to your Assets folder in your project.
 - Add the namespace in your script `using VAwait;`  
