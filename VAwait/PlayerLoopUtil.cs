@@ -80,7 +80,7 @@ namespace VAwait
 
         void AssignPlayerLoop(bool addElseRemove)
         {
-            playerLoop = PlayerLoop.GetDefaultPlayerLoop();
+            playerLoop = PlayerLoop.GetCurrentPlayerLoop();
             var update = GetUpdate(playerLoop);
 
             if (addElseRemove)
